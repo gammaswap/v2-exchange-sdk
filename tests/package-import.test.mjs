@@ -3,17 +3,17 @@ import test from "node:test";
 
 test("package root and public subpath exports can be imported", async () => {
   const modules = await Promise.all([
-    import("@my-company/exchange-sdk"),
-    import("@my-company/exchange-sdk/builders"),
-    import("@my-company/exchange-sdk/client"),
-    import("@my-company/exchange-sdk/constants"),
-    import("@my-company/exchange-sdk/errors"),
-    import("@my-company/exchange-sdk/hashing"),
-    import("@my-company/exchange-sdk/schemas"),
-    import("@my-company/exchange-sdk/signing"),
-    import("@my-company/exchange-sdk/types"),
-    import("@my-company/exchange-sdk/utils"),
-    import("@my-company/exchange-sdk/websocket"),
+    import("@gammaswap/v2-exchange-sdk"),
+    import("@gammaswap/v2-exchange-sdk/builders"),
+    import("@gammaswap/v2-exchange-sdk/client"),
+    import("@gammaswap/v2-exchange-sdk/constants"),
+    import("@gammaswap/v2-exchange-sdk/errors"),
+    import("@gammaswap/v2-exchange-sdk/hashing"),
+    import("@gammaswap/v2-exchange-sdk/schemas"),
+    import("@gammaswap/v2-exchange-sdk/signing"),
+    import("@gammaswap/v2-exchange-sdk/types"),
+    import("@gammaswap/v2-exchange-sdk/utils"),
+    import("@gammaswap/v2-exchange-sdk/websocket"),
   ]);
 
   for (const module of modules) {
