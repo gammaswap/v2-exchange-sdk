@@ -20,3 +20,7 @@ export function deriveAccountsFromMnemonic(
 
     return accounts;
 }
+
+export function getCurrentTime() : bigint {
+    return BigInt(Math.floor(Date.now() / 1000));
+}
