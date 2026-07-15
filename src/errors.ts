@@ -29,6 +29,27 @@ export class ProtocolValidationError extends ExchangeSdkError {
   }
 }
 
+export class HttpClientError extends ExchangeSdkError {
+  constructor(message: string) {
+    super(message);
+    this.name = "HttpClientError";
+  }
+}
+
+export class HttpResponseError extends HttpClientError {
+  readonly status: number;
+  readonly statusText: string;
+  readonly data: unknown;
+
+  constructor(status: number, statusText: string, data: unknown) {
+    super(`HTTP request failed with status ${status}${statusText ? ` ${statusText}` : ""}`);
+    this.name = "HttpResponseError";
+    this.status = status;
+    this.statusText = statusText;
+    this.data = data;
+  }
+}
+
 export function createProtocolValidationError(
   code: ProtocolValidationCode,
   path: string,
