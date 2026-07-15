@@ -4,8 +4,8 @@
   "description": "TypeScript SDK for the GammaSwap v2 exchange.",
   "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@10.11.0",
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -60,10 +60,14 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm build && node --test tests/*.test.mjs",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "pnpm build"
   },
   "repository": {
     "type": "git",
@@ -73,22 +77,20 @@
     "url": "https://github.com/gammaswap/v2-exchange-sdk/issues"
   },
   "homepage": "https://github.com/gammaswap/v2-exchange-sdk#readme",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@gammaswap"
-  },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=10"
   },
   "sideEffects": false,
   "dependencies": {
-    "@gammaswap/v2-exchange": "^0.11.0",
-    "dotenv": "^17.2.3",
     "ethers": "^6.15.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/node": "^24.10.1",
-    "axios": "1.15.2",
-    "ts-node": "^10.9.2",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript-eslint": "^8.0.0",
     "typescript": "^5.9.3"
   }
 }

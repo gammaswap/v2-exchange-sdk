@@ -28,7 +28,10 @@ import * as signing from "@gammaswap/v2-exchange-sdk/signing";
 ## Development
 
 ```sh
-npm install
-npm run build
-npm run typecheck
+pnpm install
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm test
 ```
