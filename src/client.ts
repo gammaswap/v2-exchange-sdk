@@ -68,6 +68,7 @@ import type {
   ProtocolBigNumberish,
   ProtocolInput,
 } from "./types.js";
+import { NonceManager } from "./nonce-manager.js";
 
 export interface HttpResult<T = unknown> {
   status: number;
@@ -100,6 +101,7 @@ export interface ExchangeClientOptions extends HttpClientOptions {
   wallet: Wallet;
   chainId?: ProtocolBigNumberish;
   infoClient?: InfoClient;
+  nonceManager?: NonceManager;
 }
 
 type DefaultSignerFields = "signer" | "signatureType" | "sender";
@@ -240,6 +242,7 @@ export class ExchangeClient {
   private readonly fetchFn: FetchLike;
   private readonly headers: Record<string, string>;
   private readonly chainId: ProtocolBigNumberish;
+  private readonly nonceManager: NonceManager;
 
   constructor(options: ExchangeClientOptions) {
     this.apiUrl = normalizeApiUrl(options.apiUrl);
@@ -254,11 +257,13 @@ export class ExchangeClient {
         fetch: this.fetchFn,
         headers: this.headers,
       });
+    this.nonceManager = options.nonceManager ?? new NonceManager();
   }
 
   async placeOrder(input: PlaceOrderInput): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const order = buildOrder({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender: input.sender ?? this.wallet.address,
@@ -282,6 +287,7 @@ export class ExchangeClient {
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     const order = buildOrder({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.AGENT,
       approvalNonce,
@@ -303,6 +309,7 @@ export class ExchangeClient {
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     return this.signAndPostCancel({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender: input.sender ?? this.wallet.address,
@@ -310,7 +317,11 @@ export class ExchangeClient {
   }
 
   async cancelAll(input: CancelAllInput): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    return this.cancelOrder({ ...input, orderHash: ZeroHash });
+    return this.cancelOrder({
+      ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
+      orderHash: ZeroHash
+    });
   }
 
   async cancelAgentOrder(
@@ -320,6 +331,7 @@ export class ExchangeClient {
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     return this.signAndPostCancel({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.AGENT,
       approvalNonce,
@@ -329,12 +341,17 @@ export class ExchangeClient {
   async cancelAllAgent(
     input: CancelAllAgentInput,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    return this.cancelAgentOrder({ ...input, orderHash: ZeroHash });
+    return this.cancelAgentOrder({
+      ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
+      orderHash: ZeroHash
+    });
   }
 
   async claim(input: ClaimInput): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     return this.signAndPostClaim({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender: input.sender ?? this.wallet.address,
@@ -346,6 +363,7 @@ export class ExchangeClient {
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     return this.signAndPostClaim({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.AGENT,
       approvalNonce,
@@ -357,6 +375,7 @@ export class ExchangeClient {
   ): Promise<ExchangeActionResult<JsonSignedWithdrawalMessage>> {
     const withdrawal = buildWithdrawal({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender: input.sender ?? this.wallet.address,
@@ -387,6 +406,7 @@ export class ExchangeClient {
       });
     const approval = buildApproveAgent({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender,
@@ -409,6 +429,7 @@ export class ExchangeClient {
   ): Promise<ExchangeActionResult<JsonSignedRevokeAgentMessage>> {
     const revocation = buildRevokeAgent({
       ...input,
+      nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
       sender: input.sender ?? this.wallet.address,
