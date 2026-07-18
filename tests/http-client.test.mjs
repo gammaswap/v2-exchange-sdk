@@ -8,7 +8,7 @@ import {
   NonceManager,
   ProtocolValidationError,
 } from "@gammaswap/v2-exchange-sdk";
-import { SignatureType } from "@gammaswap/v2-exchange-sdk/constants";
+import { SignatureType, OrderSide, TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
 import { validateSignatureJS } from "@gammaswap/v2-exchange-sdk/signing";
 
 const WALLET = new Wallet(`0x${"11".repeat(32)}`);
@@ -56,11 +56,11 @@ function baseOrderInput(overrides = {}) {
   return {
     nonce: "1",
     epoch: "2",
-    side: false,
+    side: OrderSide.BUY,
     assetId: "123456789012345678901234567890",
     size: "1000000",
     price: "500000",
-    timeInForce: "1",
+    timeInForce: TimeInForce.GTC,
     approvalNonce: "0",
     ...overrides,
   };

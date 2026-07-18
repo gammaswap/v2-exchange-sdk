@@ -22,6 +22,17 @@ export const OrderType = {
   AGENT_REVOKE: 62n,
 };
 
+export const TimeInForce = {
+  GTC: 0n,
+  FOK: 1n,
+  IOC: 2n,
+} as const;
+
+export const OrderSide = {
+  BUY: false,
+  SELL: true,
+} as const;
+
 // Compatibility: the on-chain deposit hash intentionally keeps the original
 // DepositSweepOrder struct string so typ-7 journal replay idempotency is stable.
 export const DEPOSIT_SWEEP_ORDER_TYPEHASH = keccak256(

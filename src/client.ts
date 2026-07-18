@@ -26,7 +26,7 @@ import {
   type BuildRevokeAgentInput,
   type BuildWithdrawalInput,
 } from "./builders.js";
-import { SignatureType } from "./constants.js";
+import { SignatureType, TimeInForce } from "./constants.js";
 import { HttpResponseError, createProtocolValidationError } from "./errors.js";
 import {
   CHAIN_ID,
@@ -263,6 +263,7 @@ export class ExchangeClient {
   async placeOrder(input: PlaceOrderInput): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const order = buildOrder({
       ...input,
+      timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.EOA,
@@ -287,6 +288,7 @@ export class ExchangeClient {
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     const order = buildOrder({
       ...input,
+      timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: input.signer ?? this.wallet.address,
       signatureType: input.signatureType ?? SignatureType.AGENT,
