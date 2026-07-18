@@ -5,6 +5,7 @@ import {
   createExchangeClient,
   createInfoClient,
   HttpResponseError,
+  NonceManager,
   ProtocolValidationError,
 } from "@gammaswap/v2-exchange-sdk";
 import { SignatureType } from "@gammaswap/v2-exchange-sdk/constants";
@@ -168,6 +169,48 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   assert.ok(validateSignatureJS(approval.request.orderHash, approval.request.signature, MASTER));
   assert.ok(
     validateSignatureJS(revocation.request.orderHash, revocation.request.signature, MASTER),
+  );
+});
+
+test("ExchangeClient placeOrder uses its nonce manager when nonce is omitted", async () => {
+  const nowMs = 1_700_000_000_000;
+  const nonceManager = new NonceManager({
+    now: () => nowMs,
+  });
+  const mock = createFetchMock(() => ({ data: { accepted: true } }));
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    fetch: mock.fetch,
+    nonceManager,
+  });
+  const orderInput = baseOrderInput({ nonce: undefined });
+
+  const first = await client.placeOrder(orderInput);
+  const second = await client.placeOrder(orderInput);
+
+  const firstNonce = BigInt(first.request.order.nonce);
+  const secondNonce = BigInt(second.request.order.nonce);
+  const { nonce: firstNonceJson, ...firstOrderWithoutNonce } = first.request.order;
+  const { nonce: secondNonceJson, ...secondOrderWithoutNonce } = second.request.order;
+
+  assert.equal(firstNonceJson, firstNonce.toString());
+  assert.equal(secondNonceJson, secondNonce.toString());
+  assert.equal(NonceManager.getTimestampMs(firstNonce), BigInt(nowMs));
+  assert.equal(NonceManager.getTimestampMs(secondNonce), BigInt(nowMs));
+  assert.equal(NonceManager.getCounter(firstNonce), 1);
+  assert.equal(NonceManager.getCounter(secondNonce), 2);
+  assert.deepEqual(firstOrderWithoutNonce, secondOrderWithoutNonce);
+  assert.notEqual(first.request.orderHash, second.request.orderHash);
+  assert.ok(validateSignatureJS(first.request.orderHash, first.request.signature, MASTER));
+  assert.ok(validateSignatureJS(second.request.orderHash, second.request.signature, MASTER));
+  assert.deepEqual(
+    mock.calls.map((call) => [call.init.method, new URL(call.url).pathname]),
+    [
+      ["POST", "/orders"],
+      ["POST", "/orders"],
+    ],
   );
 });
 
