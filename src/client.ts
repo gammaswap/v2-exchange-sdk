@@ -265,9 +265,9 @@ export class ExchangeClient {
       ...input,
       timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
-      sender: input.sender ?? this.wallet.address,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
     });
     const orderHash = hashFillOrderJS(order);
     const message = buildSignedOrderMessage({
@@ -290,8 +290,8 @@ export class ExchangeClient {
       ...input,
       timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.AGENT,
+      signer: this.wallet.address,
+      signatureType: SignatureType.AGENT,
       approvalNonce,
     });
     const orderHash = hashFillOrderJS(order);
@@ -312,9 +312,9 @@ export class ExchangeClient {
     return this.signAndPostCancel({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
-      sender: input.sender ?? this.wallet.address,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
     });
   }
 
@@ -334,8 +334,8 @@ export class ExchangeClient {
     return this.signAndPostCancel({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.AGENT,
+      signer: this.wallet.address,
+      signatureType: SignatureType.AGENT,
       approvalNonce,
     });
   }
@@ -354,9 +354,9 @@ export class ExchangeClient {
     return this.signAndPostClaim({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
-      sender: input.sender ?? this.wallet.address,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
     });
   }
 
@@ -366,8 +366,8 @@ export class ExchangeClient {
     return this.signAndPostClaim({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.AGENT,
+      signer: this.wallet.address,
+      signatureType: SignatureType.AGENT,
       approvalNonce,
     });
   }
@@ -378,9 +378,9 @@ export class ExchangeClient {
     const withdrawal = buildWithdrawal({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
-      sender: input.sender ?? this.wallet.address,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
     });
     const orderHash = hashWithdrawalOrderJS(withdrawal);
     const message = buildSignedWithdrawalMessage({
@@ -397,7 +397,7 @@ export class ExchangeClient {
   async approveAgent(
     input: ApproveAgentInput,
   ): Promise<ExchangeActionResult<JsonSignedApproveAgentMessage>> {
-    const sender = input.sender ?? this.wallet.address;
+    const sender = this.wallet.address;
     const approvalSignature =
       input.approvalSignature ??
       this.signAgentApproval({
@@ -409,8 +409,8 @@ export class ExchangeClient {
     const approval = buildApproveAgent({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
       sender,
       approvalSignature,
     });
@@ -432,9 +432,9 @@ export class ExchangeClient {
     const revocation = buildRevokeAgent({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      signer: input.signer ?? this.wallet.address,
-      signatureType: input.signatureType ?? SignatureType.EOA,
-      sender: input.sender ?? this.wallet.address,
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
     });
     const orderHash = hashRevokeAgentOrderJS(revocation);
     const message = buildSignedRevokeAgentMessage({
