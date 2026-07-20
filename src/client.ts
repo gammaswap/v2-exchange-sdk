@@ -19,12 +19,8 @@ import {
   buildSignedWithdrawalMessage,
   buildSignedWithdrawalMessageJson,
   buildWithdrawal,
-  type BuildApproveAgentInput,
   type BuildCancelInput,
   type BuildClaimInput,
-  type BuildOrderInput,
-  type BuildRevokeAgentInput,
-  type BuildWithdrawalInput,
 } from "./builders.js";
 import { SignatureType, TimeInForce } from "./constants.js";
 import { HttpResponseError, createProtocolValidationError } from "./errors.js";
@@ -51,7 +47,6 @@ import { signOrderJS } from "./signing.js";
 import type {
   Address,
   Eip712AgentApproval,
-  Eip712AgentApprovalInput,
   GetAgentApprovalRequest,
   GetAssetRequest,
   GetBalanceRequest,
@@ -67,6 +62,18 @@ import type {
   JsonSignedWithdrawalMessage,
   ProtocolBigNumberish,
   ProtocolInput,
+  PlaceOrderInput,
+  PlaceAgentOrderInput,
+  CancelOrderInput,
+  CancelAllInput,
+  CancelAgentOrderInput,
+  CancelAllAgentInput,
+  ClaimInput,
+  AgentClaimInput,
+  WithdrawalInput,
+  ApproveAgentInput,
+  RevokeAgentInput,
+  AgentApprovalInput,
 } from "./types.js";
 import { NonceManager } from "./nonce-manager.js";
 
@@ -104,44 +111,8 @@ export interface ExchangeClientOptions extends HttpClientOptions {
   nonceManager?: NonceManager;
 }
 
-type DefaultSignerFields = "signer" | "signatureType" | "sender";
-type AgentSignerFields = "signer" | "signatureType";
-
-export type PlaceOrderInput = Omit<BuildOrderInput, DefaultSignerFields> &
-  Partial<Pick<BuildOrderInput, DefaultSignerFields>>;
-
-export type PlaceAgentOrderInput = Omit<BuildOrderInput, AgentSignerFields | "approvalNonce"> &
-  Partial<Pick<BuildOrderInput, AgentSignerFields | "approvalNonce">>;
-
-export type CancelOrderInput = Omit<BuildCancelInput, DefaultSignerFields> &
-  Partial<Pick<BuildCancelInput, DefaultSignerFields>>;
-
-export type CancelAllInput = Omit<CancelOrderInput, "orderHash">;
-
-export type CancelAgentOrderInput = Omit<BuildCancelInput, AgentSignerFields | "approvalNonce"> &
-  Partial<Pick<BuildCancelInput, AgentSignerFields | "approvalNonce">>;
-
-export type CancelAllAgentInput = Omit<CancelAgentOrderInput, "orderHash">;
-
-export type ClaimInput = Omit<BuildClaimInput, DefaultSignerFields> &
-  Partial<Pick<BuildClaimInput, DefaultSignerFields>>;
-
-export type AgentClaimInput = Omit<BuildClaimInput, AgentSignerFields | "approvalNonce"> &
-  Partial<Pick<BuildClaimInput, AgentSignerFields | "approvalNonce">>;
-
-export type WithdrawalInput = Omit<BuildWithdrawalInput, DefaultSignerFields> &
-  Partial<Pick<BuildWithdrawalInput, DefaultSignerFields>>;
-
-export type ApproveAgentInput = Omit<
-  BuildApproveAgentInput,
-  "signer" | "signatureType" | "sender" | "approvalSignature"
-> &
-  Partial<
-    Pick<BuildApproveAgentInput, "signer" | "signatureType" | "sender" | "approvalSignature">
-  >;
-
-export type RevokeAgentInput = Omit<BuildRevokeAgentInput, DefaultSignerFields> &
-  Partial<Pick<BuildRevokeAgentInput, DefaultSignerFields>>;
+type ExactInput<Allowed, Actual extends Allowed> =
+  Actual & Record<Exclude<keyof Actual, keyof Allowed>, never>;
 
 interface AgentStatusResponse {
   nonce: ProtocolBigNumberish;
@@ -260,7 +231,9 @@ export class ExchangeClient {
     this.nonceManager = options.nonceManager ?? new NonceManager();
   }
 
-  async placeOrder(input: PlaceOrderInput): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
+  async placeOrder<const TInput extends PlaceOrderInput>(
+    input: ExactInput<PlaceOrderInput, TInput>,
+  ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const order = buildOrder({
       ...input,
       timeInForce: input.timeInForce ?? TimeInForce.GTC,
@@ -268,6 +241,7 @@ export class ExchangeClient {
       signer: this.wallet.address,
       signatureType: SignatureType.EOA,
       sender: this.wallet.address,
+      approvalNonce: 0n,
     });
     const orderHash = hashFillOrderJS(order);
     const message = buildSignedOrderMessage({
@@ -281,8 +255,8 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
-  async placeAgentOrder(
-    input: PlaceAgentOrderInput,
+  async placeAgentOrder<const TInput extends PlaceAgentOrderInput>(
+    input: ExactInput<PlaceAgentOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const approvalNonce =
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
@@ -306,8 +280,8 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
-  async cancelOrder(
-    input: CancelOrderInput,
+  async cancelOrder<const TInput extends CancelOrderInput>(
+    input: ExactInput<CancelOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     return this.signAndPostCancel({
       ...input,
@@ -315,10 +289,13 @@ export class ExchangeClient {
       signer: this.wallet.address,
       signatureType: SignatureType.EOA,
       sender: this.wallet.address,
+      approvalNonce: 0n,
     });
   }
 
-  async cancelAll(input: CancelAllInput): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
+  async cancelAll<const TInput extends CancelAllInput>(
+    input: ExactInput<CancelAllInput, TInput>
+  ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     return this.cancelOrder({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
@@ -326,8 +303,8 @@ export class ExchangeClient {
     });
   }
 
-  async cancelAgentOrder(
-    input: CancelAgentOrderInput,
+  async cancelAgentOrder<const TInput extends CancelAgentOrderInput>(
+    input: ExactInput<CancelAgentOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     const approvalNonce =
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
@@ -340,8 +317,8 @@ export class ExchangeClient {
     });
   }
 
-  async cancelAllAgent(
-    input: CancelAllAgentInput,
+  async cancelAllAgent<const TInput extends CancelAllAgentInput>(
+    input: ExactInput<CancelAllAgentInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     return this.cancelAgentOrder({
       ...input,
@@ -350,17 +327,22 @@ export class ExchangeClient {
     });
   }
 
-  async claim(input: ClaimInput): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
+  async claim<const TInput extends ClaimInput>(
+    input: ExactInput<ClaimInput, TInput>
+  ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     return this.signAndPostClaim({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: this.wallet.address,
       signatureType: SignatureType.EOA,
       sender: this.wallet.address,
+      approvalNonce: 0n,
     });
   }
 
-  async claimAgent(input: AgentClaimInput): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
+  async claimAgent<const TInput extends AgentClaimInput>(
+      input: ExactInput<AgentClaimInput, TInput>
+  ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     const approvalNonce =
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     return this.signAndPostClaim({
@@ -372,11 +354,13 @@ export class ExchangeClient {
     });
   }
 
-  async withdraw(
-    input: WithdrawalInput,
+  async withdraw<const TInput extends WithdrawalInput>(
+    input: ExactInput<WithdrawalInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedWithdrawalMessage>> {
     const withdrawal = buildWithdrawal({
       ...input,
+      receiver: input.receiver ?? this.wallet.address,
+      ledger: input.ledger,// TODO: this has to come from the info client? Maybe get request? Or set when initialized
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: this.wallet.address,
       signatureType: SignatureType.EOA,
@@ -394,17 +378,16 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
-  async approveAgent(
-    input: ApproveAgentInput,
+  async approveAgent<const TInput extends ApproveAgentInput>(
+    input: ExactInput<ApproveAgentInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedApproveAgentMessage>> {
     const sender = this.wallet.address;
+    const approvalNonce = input.approvalNonce ?? BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000));
     const approvalSignature =
-      input.approvalSignature ??
       this.signAgentApproval({
         master: sender,
         agent: input.agent,
-        approvalNonce: input.approvalNonce,
-        approvalSignature: "0x",
+        approvalNonce,
       });
     const approval = buildApproveAgent({
       ...input,
@@ -413,6 +396,7 @@ export class ExchangeClient {
       signatureType: SignatureType.EOA,
       sender,
       approvalSignature,
+      approvalNonce,
     });
     const orderHash = hashApproveAgentOrderJS(approval);
     const message = buildSignedApproveAgentMessage({
@@ -426,8 +410,8 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
-  async revokeAgent(
-    input: RevokeAgentInput,
+  async revokeAgent<const TInput extends RevokeAgentInput>(
+    input: ExactInput<RevokeAgentInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedRevokeAgentMessage>> {
     const revocation = buildRevokeAgent({
       ...input,
@@ -448,7 +432,7 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
-  signAgentApproval(approval: Eip712AgentApprovalInput): string {
+  signAgentApproval(approval: AgentApprovalInput): string {
     const parsedApproval: Eip712AgentApproval = buildAgentApproval(approval);
     const approvalHash = hashAgentApprovalJS(parsedApproval);
     return signOrderJS(approvalHash, this.wallet);

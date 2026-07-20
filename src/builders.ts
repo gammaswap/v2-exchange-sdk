@@ -116,6 +116,7 @@ export type BuildResolutionInput = Omit<Eip712ResolutionInput, "typ">;
 export type BuildPauseInput = Omit<Eip712PauseInput, "typ">;
 export type BuildInvalidateInput = Omit<Eip712InvalidateInput, "typ">;
 export type BuildOnchainDepositInput = Omit<Eip712OnchainDepositInput, "typ">;
+export type BuildAgentApprovalInput = Omit<Eip712AgentApprovalInput, "approvalSignature">;
 
 export function buildOrder(input: BuildOrderInput): Eip712Order {
   return parseEip712Order({ ...input, typ: OrderType.FILL });
@@ -163,8 +164,8 @@ export function buildOnchainDeposit(input: BuildOnchainDepositInput): Eip712Onch
   return parseEip712OnchainDeposit({ ...input, typ: OrderType.ONCHAIN_DEPOSIT });
 }
 
-export function buildAgentApproval(input: Eip712AgentApprovalInput): Eip712AgentApproval {
-  return parseEip712AgentApproval(input);
+export function buildAgentApproval(input: BuildAgentApprovalInput): Eip712AgentApproval {
+  return parseEip712AgentApproval({...input, approvalSignature: "0x"});
 }
 
 export interface BuildSignedOrderMessageInput extends Omit<

@@ -117,7 +117,7 @@ const agentApprovalJson = {
   master: ACCOUNT,
   agent: AGENT,
   approvalNonce: "7",
-  approvalSignature: APPROVAL_SIGNATURE,
+  approvalSignature: "0x",
 };
 
 const actionCases = [

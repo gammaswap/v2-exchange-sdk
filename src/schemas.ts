@@ -1,5 +1,5 @@
 import { isAddress } from "ethers";
-import { OrderType, SignatureType } from "./constants.js";
+import { OrderType, SignatureType, TimeInForce } from "./constants.js";
 import { createProtocolValidationError } from "./errors.js";
 import type {
   Eip712AgentApproval,
@@ -290,6 +290,23 @@ function nested<T extends object>(schema: InternalProtocolSchema<T>): FieldSpec<
   };
 }
 
+const timeInForceValues = new Set<bigint>(Object.values(TimeInForce));
+
+function parseTimeInForce(input: unknown, path: string): bigint {
+    const value = parseUnsignedInteger(input, path, UINT8_MAX);
+
+    if (!timeInForceValues.has(value)) {
+        throw createProtocolValidationError("invalid_value", path, "unknown timeInForce");
+    }
+
+    return value;
+}
+
+const timeInForce: FieldSpec<bigint> = {
+    parse: parseTimeInForce,
+    serialize: (value) => value.toString(),
+};
+
 export const eip712OrderSchema = objectSchema<Eip712Order>({
   typ: exactUint(OrderType.FILL),
   nonce: uint64,
@@ -301,7 +318,7 @@ export const eip712OrderSchema = objectSchema<Eip712Order>({
   assetId: uint256,
   size: uint64,
   price: uint24,
-  timeInForce: uint8,
+  timeInForce,
   approvalNonce: uint32,
 });
 

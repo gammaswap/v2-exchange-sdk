@@ -61,6 +61,14 @@ function baseOrderInput(overrides = {}) {
     size: "1000000",
     price: "500000",
     timeInForce: TimeInForce.GTC,
+    ...overrides,
+  };
+}
+
+function baseAgentOrderInput(overrides = {}) {
+  return {
+    ...baseOrderInput(),
+    sender: MASTER,
     approvalNonce: "0",
     ...overrides,
   };
@@ -72,6 +80,14 @@ function baseCancelInput(overrides = {}) {
     assetId: "123456789012345678901234567890",
     epoch: "2",
     orderHash: ORDER_HASH,
+    ...overrides,
+  };
+}
+
+function baseAgentCancelInput(overrides = {}) {
+  return {
+    ...baseCancelInput(),
+    sender: MASTER,
     approvalNonce: "0",
     ...overrides,
   };
@@ -82,6 +98,14 @@ function baseClaimInput(overrides = {}) {
     nonce: "3",
     assetId: "123456789012345678901234567890",
     epoch: "2",
+    ...overrides,
+  };
+}
+
+function baseAgentClaimInput(overrides = {}) {
+  return {
+    ...baseClaimInput(),
+    sender: MASTER,
     approvalNonce: "0",
     ...overrides,
   };
@@ -228,15 +252,11 @@ test("ExchangeClient agent actions fetch approval nonce and sign as the agent", 
     fetch: mock.fetch,
   });
 
-  const order = await client.placeAgentOrder(
-    baseOrderInput({ sender: MASTER, approvalNonce: undefined }),
-  );
+  const order = await client.placeAgentOrder(baseAgentOrderInput({ approvalNonce: undefined }));
   const cancel = await client.cancelAgentOrder(
-    baseCancelInput({ sender: MASTER, approvalNonce: undefined }),
+    baseAgentCancelInput({ approvalNonce: undefined }),
   );
-  const claim = await client.claimAgent(
-    baseClaimInput({ sender: MASTER, approvalNonce: undefined }),
-  );
+  const claim = await client.claimAgent(baseAgentClaimInput({ approvalNonce: undefined }));
 
   assert.deepEqual(
     mock.calls.map((call) => [call.init.method, new URL(call.url).pathname]),
@@ -297,7 +317,7 @@ test("ExchangeClient rejects invalid agent status nonce before posting agent act
   });
 
   await assert.rejects(
-    () => client.placeAgentOrder(baseOrderInput({ sender: MASTER, approvalNonce: undefined })),
+    () => client.placeAgentOrder(baseAgentOrderInput({ approvalNonce: undefined })),
     ProtocolValidationError,
   );
   assert.equal(mock.calls.length, 1);
