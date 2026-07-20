@@ -8,6 +8,7 @@ test("package root and public subpath exports can be imported", async () => {
     import("@gammaswap/v2-exchange-sdk/client"),
     import("@gammaswap/v2-exchange-sdk/config"),
     import("@gammaswap/v2-exchange-sdk/constants"),
+    import("@gammaswap/v2-exchange-sdk/deposit-client"),
     import("@gammaswap/v2-exchange-sdk/errors"),
     import("@gammaswap/v2-exchange-sdk/hashing"),
     import("@gammaswap/v2-exchange-sdk/schemas"),

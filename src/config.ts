@@ -37,10 +37,11 @@ export const LOCALHOST_EXCHANGE_CHAIN_CONFIG = parseExchangeChainConfig({
 });
 
 const defaultExchangeChainConfigs = new Map<bigint, ExchangeChainConfig>(
-  [BASE_EXCHANGE_CHAIN_CONFIG, BASE_SEPOLIA_EXCHANGE_CHAIN_CONFIG, LOCALHOST_EXCHANGE_CHAIN_CONFIG].map((config) => [
-    config.chainId,
-    config,
-  ]),
+  [
+    BASE_EXCHANGE_CHAIN_CONFIG,
+    BASE_SEPOLIA_EXCHANGE_CHAIN_CONFIG,
+    LOCALHOST_EXCHANGE_CHAIN_CONFIG,
+  ].map((config) => [config.chainId, config]),
 );
 
 export function getDefaultExchangeChainConfig(

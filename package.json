@@ -28,6 +28,10 @@
       "types": "./dist/constants.d.ts",
       "import": "./dist/constants.js"
     },
+    "./deposit-client": {
+      "types": "./dist/deposit-client.d.ts",
+      "import": "./dist/deposit-client.js"
+    },
     "./errors": {
       "types": "./dist/errors.d.ts",
       "import": "./dist/errors.js"
