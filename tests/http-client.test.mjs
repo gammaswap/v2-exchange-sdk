@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Wallet, ZeroHash } from "ethers";
 import {
+  getDefaultExchangeChainConfig,
   createExchangeClient,
   createInfoClient,
   HttpResponseError,
@@ -9,6 +10,8 @@ import {
   ProtocolValidationError,
 } from "@gammaswap/v2-exchange-sdk";
 import { SignatureType, OrderSide, TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
+import { getExchangeDomain, hashFillOrderJS } from "@gammaswap/v2-exchange-sdk/hashing";
+import { parseEip712Order } from "@gammaswap/v2-exchange-sdk/schemas";
 import { validateSignatureJS } from "@gammaswap/v2-exchange-sdk/signing";
 
 const WALLET = new Wallet(`0x${"11".repeat(32)}`);
@@ -18,6 +21,9 @@ const AGENT = AGENT_WALLET.address;
 const TOKEN = "0x0000000000000000000000000000000000000004";
 const LEDGER = "0x0000000000000000000000000000000000000005";
 const RECEIVER = "0x0000000000000000000000000000000000000006";
+const EXCHANGE = "0x0000000000000000000000000000000000000007";
+const DEPOSIT_LEDGER = "0x0000000000000000000000000000000000000008";
+const PERMIT2 = "0x0000000000000000000000000000000000000009";
 const ORDER_HASH = `0x${"33".repeat(32)}`;
 
 function createFetchMock(handler) {
@@ -111,8 +117,28 @@ function baseAgentClaimInput(overrides = {}) {
   };
 }
 
+function exchangeConfig(overrides = {}) {
+  return {
+    chainId: "31337",
+    contracts: {
+      exchange: EXCHANGE,
+      ledger: LEDGER,
+      depositLedger: DEPOSIT_LEDGER,
+      settlementToken: TOKEN,
+      permit2: PERMIT2,
+    },
+    ...overrides,
+  };
+}
+
 test("InfoClient implements the GET routes used by src/test examples", async () => {
-  const mock = createFetchMock(() => ({ data: { ok: true } }));
+  const mock = createFetchMock((call) => {
+    if (new URL(call.url).pathname === "/api/config/chains/31337") {
+      return { data: exchangeConfig() };
+    }
+
+    return { data: { ok: true } };
+  });
   const client = createInfoClient({
     apiUrl: "http://localhost:3000/api",
     fetch: mock.fetch,
@@ -125,6 +151,9 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
   await client.getTopOfBook({ assetId: "2", epoch: "3" });
   await client.getPosition({ account: MASTER, assetId: "2", epoch: "3" });
   await client.getAgentApproval(MASTER);
+  const config = await client.getExchangeConfig("31337");
+
+  assert.deepEqual(config.data, exchangeConfig());
 
   assert.deepEqual(
     mock.calls.map((call) => call.url),
@@ -136,6 +165,7 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
       "http://localhost:3000/api/book/market/top/2/3",
       `http://localhost:3000/api/position/${MASTER}/2/3`,
       `http://localhost:3000/api/agents/status/${MASTER}`,
+      "http://localhost:3000/api/config/chains/31337",
     ],
   );
   assert.ok(mock.calls.every((call) => call.init.method === "GET"));
@@ -147,6 +177,7 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
     apiUrl: "http://localhost:3000",
     wallet: WALLET,
     chainId: "31337",
+    contracts: exchangeConfig().contracts,
     fetch: mock.fetch,
   });
 
@@ -157,7 +188,6 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
     nonce: "4",
     receiver: RECEIVER,
     amount: "1000000",
-    ledger: LEDGER,
   });
   const approval = await client.approveAgent({
     nonce: "5",
@@ -182,6 +212,10 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   assert.equal(order.request.order.sender, MASTER);
   assert.equal(order.request.order.signatureType, SignatureType.EOA.toString());
   assert.equal(typeof order.request.order.nonce, "string");
+  assert.equal(
+    order.request.orderHash,
+    hashFillOrderJS(parseEip712Order(order.request.order), getExchangeDomain("31337", EXCHANGE)),
+  );
   assert.ok(validateSignatureJS(order.request.orderHash, order.request.signature, MASTER));
 
   assert.equal(cancel.request.cancel.orderHash, ZeroHash);
@@ -238,6 +272,27 @@ test("ExchangeClient placeOrder uses its nonce manager when nonce is omitted", a
   );
 });
 
+test("ExchangeClient uses hard-coded localhost contracts when no contracts are provided", async () => {
+  const defaultConfig = getDefaultExchangeChainConfig("31337");
+  assert.ok(defaultConfig);
+
+  const mock = createFetchMock(() => ({ data: { accepted: true } }));
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    fetch: mock.fetch,
+  });
+
+  const withdrawal = await client.withdraw({
+    nonce: "4",
+    receiver: RECEIVER,
+    amount: "1000000",
+  });
+
+  assert.equal(withdrawal.request.withdrawal.ledger, defaultConfig.contracts.ledger);
+});
+
 test("ExchangeClient agent actions fetch approval nonce and sign as the agent", async () => {
   const mock = createFetchMock((call) => {
     if (call.init.method === "GET") {
@@ -253,9 +308,7 @@ test("ExchangeClient agent actions fetch approval nonce and sign as the agent", 
   });
 
   const order = await client.placeAgentOrder(baseAgentOrderInput({ approvalNonce: undefined }));
-  const cancel = await client.cancelAgentOrder(
-    baseAgentCancelInput({ approvalNonce: undefined }),
-  );
+  const cancel = await client.cancelAgentOrder(baseAgentCancelInput({ approvalNonce: undefined }));
   const claim = await client.claimAgent(baseAgentClaimInput({ approvalNonce: undefined }));
 
   assert.deepEqual(
@@ -298,6 +351,7 @@ test("ExchangeClient rejects invalid signed action fields before posting", async
   const client = createExchangeClient({
     apiUrl: "http://localhost:3000",
     wallet: WALLET,
+    chainId: "31337",
     fetch: mock.fetch,
   });
 
@@ -313,6 +367,7 @@ test("ExchangeClient rejects invalid agent status nonce before posting agent act
   const client = createExchangeClient({
     apiUrl: "http://localhost:3000",
     wallet: AGENT_WALLET,
+    chainId: "31337",
     fetch: mock.fetch,
   });
 

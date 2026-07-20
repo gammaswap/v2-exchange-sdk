@@ -14,10 +14,13 @@ import type {
   Eip712Resolution,
   Eip712RevokeAgent,
   Eip712Withdrawal,
+  ExchangeChainConfig,
+  ExchangeContracts,
   GetAgentApprovalRequest,
   GetAssetRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
+  GetExchangeConfigRequest,
   GetOrderBookRequest,
   GetPositionRequest,
   GetTopOfBookRequest,
@@ -251,7 +254,6 @@ function exactUint(expected: bigint, max: bigint = UINT8_MAX): FieldSpec<bigint>
   };
 }
 
-const uint8 = uint(UINT8_MAX);
 const uint24 = uint(UINT24_MAX);
 const uint32 = uint(UINT32_MAX);
 const uint64 = uint(UINT64_MAX);
@@ -293,18 +295,18 @@ function nested<T extends object>(schema: InternalProtocolSchema<T>): FieldSpec<
 const timeInForceValues = new Set<bigint>(Object.values(TimeInForce));
 
 function parseTimeInForce(input: unknown, path: string): bigint {
-    const value = parseUnsignedInteger(input, path, UINT8_MAX);
+  const value = parseUnsignedInteger(input, path, UINT8_MAX);
 
-    if (!timeInForceValues.has(value)) {
-        throw createProtocolValidationError("invalid_value", path, "unknown timeInForce");
-    }
+  if (!timeInForceValues.has(value)) {
+    throw createProtocolValidationError("invalid_value", path, "unknown timeInForce");
+  }
 
-    return value;
+  return value;
 }
 
 const timeInForce: FieldSpec<bigint> = {
-    parse: parseTimeInForce,
-    serialize: (value) => value.toString(),
+  parse: parseTimeInForce,
+  serialize: (value) => value.toString(),
 };
 
 export const eip712OrderSchema = objectSchema<Eip712Order>({
@@ -434,6 +436,84 @@ export const eip712AgentApprovalSchema = objectSchema<Eip712AgentApproval>({
   approvalSignature: hexData,
 });
 
+const exchangeContractKeys = new Set([
+  "exchange",
+  "ledger",
+  "depositLedger",
+  "settlementToken",
+  "permit2",
+]);
+
+function parseExchangeContractsAt(input: unknown, path: string): ExchangeContracts {
+  const record = parseObject(input, path);
+
+  for (const key of Object.keys(record)) {
+    if (!exchangeContractKeys.has(key)) {
+      throw createProtocolValidationError(
+        "unknown_field",
+        `${path}.${key}`,
+        "field is not part of this schema",
+      );
+    }
+  }
+
+  if (!Object.hasOwn(record, "exchange")) {
+    throw createProtocolValidationError("missing_field", `${path}.exchange`, "field is required");
+  }
+  if (!Object.hasOwn(record, "ledger")) {
+    throw createProtocolValidationError("missing_field", `${path}.ledger`, "field is required");
+  }
+
+  const result: ExchangeContracts = {
+    exchange: address.parse(record.exchange, `${path}.exchange`),
+    ledger: address.parse(record.ledger, `${path}.ledger`),
+  };
+
+  if (Object.hasOwn(record, "depositLedger")) {
+    result.depositLedger = address.parse(record.depositLedger, `${path}.depositLedger`);
+  }
+  if (Object.hasOwn(record, "settlementToken")) {
+    result.settlementToken = address.parse(record.settlementToken, `${path}.settlementToken`);
+  }
+  if (Object.hasOwn(record, "permit2")) {
+    result.permit2 = address.parse(record.permit2, `${path}.permit2`);
+  }
+
+  return result;
+}
+
+export const exchangeContractsSchema: InternalProtocolSchema<ExchangeContracts> = {
+  parse(input: unknown): ExchangeContracts {
+    return parseExchangeContractsAt(input, "$");
+  },
+  parseAt(input: unknown, path: string): ExchangeContracts {
+    return parseExchangeContractsAt(input, path);
+  },
+  serialize(value: ExchangeContracts): ProtocolJson<ExchangeContracts> {
+    const output: Record<string, unknown> = {
+      exchange: value.exchange,
+      ledger: value.ledger,
+    };
+
+    if (value.depositLedger !== undefined) {
+      output.depositLedger = value.depositLedger;
+    }
+    if (value.settlementToken !== undefined) {
+      output.settlementToken = value.settlementToken;
+    }
+    if (value.permit2 !== undefined) {
+      output.permit2 = value.permit2;
+    }
+
+    return output as ProtocolJson<ExchangeContracts>;
+  },
+};
+
+export const exchangeChainConfigSchema = objectSchema<ExchangeChainConfig>({
+  chainId: uint256,
+  contracts: nested(exchangeContractsSchema),
+});
+
 export const signedOrderMessageSchema = objectSchema<SignedOrderMessage>({
   order: nested(eip712OrderSchema),
   chainId: uint256,
@@ -538,6 +618,10 @@ export const getAgentApprovalRequestSchema = objectSchema<GetAgentApprovalReques
   account: address,
 });
 
+export const getExchangeConfigRequestSchema = objectSchema<GetExchangeConfigRequest>({
+  chainId: uint256,
+});
+
 export function parseEip712Order(input: unknown): Eip712Order {
   return eip712OrderSchema.parse(input);
 }
@@ -584,6 +668,14 @@ export function parseEip712OnchainDeposit(input: unknown): Eip712OnchainDeposit 
 
 export function parseEip712AgentApproval(input: unknown): Eip712AgentApproval {
   return eip712AgentApprovalSchema.parse(input);
+}
+
+export function parseExchangeContracts(input: unknown): ExchangeContracts {
+  return exchangeContractsSchema.parse(input);
+}
+
+export function parseExchangeChainConfig(input: unknown): ExchangeChainConfig {
+  return exchangeChainConfigSchema.parse(input);
 }
 
 export function parseEip712Action(input: unknown): Eip712Action {
@@ -697,6 +789,16 @@ export function toJsonEip712AgentApproval(
   value: Eip712AgentApproval,
 ): ProtocolJson<Eip712AgentApproval> {
   return eip712AgentApprovalSchema.serialize(value);
+}
+
+export function toJsonExchangeContracts(value: ExchangeContracts): ProtocolJson<ExchangeContracts> {
+  return exchangeContractsSchema.serialize(value);
+}
+
+export function toJsonExchangeChainConfig(
+  value: ExchangeChainConfig,
+): ProtocolJson<ExchangeChainConfig> {
+  return exchangeChainConfigSchema.serialize(value);
 }
 
 export function toJsonEip712Action(action: Eip712Action): Eip712ActionJson {

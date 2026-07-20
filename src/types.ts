@@ -411,91 +411,112 @@ export interface GetAgentApprovalRequest {
   account: Address;
 }
 
-export type PlaceOrderInput = {
-    assetId: ProtocolBigNumberish,
-    epoch: ProtocolBigNumberish,
-    side: boolean,
-    price: ProtocolBigNumberish,
-    size: ProtocolBigNumberish,
-    timeInForce?: ProtocolBigNumberish,
-    nonce?: ProtocolBigNumberish,
+export interface GetExchangeConfigRequest {
+  chainId: bigint;
 }
+
+export interface ExchangeContracts {
+  exchange: Address;
+  ledger: Address;
+  depositLedger?: Address;
+  settlementToken?: Address;
+  permit2?: Address;
+}
+
+export interface ExchangeChainConfig {
+  chainId: bigint;
+  contracts: ExchangeContracts;
+}
+
+export type JsonExchangeContracts = ProtocolJson<ExchangeContracts>;
+export type JsonExchangeChainConfig = ProtocolJson<ExchangeChainConfig>;
+export type ExchangeContractsInput = ProtocolInput<ExchangeContracts>;
+export type ExchangeChainConfigInput = ProtocolInput<ExchangeChainConfig>;
+
+export type PlaceOrderInput = {
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  side: boolean;
+  price: ProtocolBigNumberish;
+  size: ProtocolBigNumberish;
+  timeInForce?: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+};
 
 export type PlaceAgentOrderInput = {
-    assetId: ProtocolBigNumberish,
-    epoch: ProtocolBigNumberish,
-    side: boolean,
-    price: ProtocolBigNumberish,
-    size: ProtocolBigNumberish,
-    timeInForce?: ProtocolBigNumberish,
-    nonce?: ProtocolBigNumberish,
-    sender: Address,
-    approvalNonce?: ProtocolBigNumberish,
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  side: boolean;
+  price: ProtocolBigNumberish;
+  size: ProtocolBigNumberish;
+  timeInForce?: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+  sender: Address;
+  approvalNonce?: ProtocolBigNumberish;
+};
 
 export type CancelOrderInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    orderHash: HexString;
-    nonce?: ProtocolBigNumberish;
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  orderHash: HexString;
+  nonce?: ProtocolBigNumberish;
+};
 
 export type CancelAllInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    nonce?: ProtocolBigNumberish;
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+};
 
 export type CancelAgentOrderInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    orderHash: HexString;
-    nonce?: ProtocolBigNumberish;
-    sender: Address,
-    approvalNonce?: ProtocolBigNumberish,
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  orderHash: HexString;
+  nonce?: ProtocolBigNumberish;
+  sender: Address;
+  approvalNonce?: ProtocolBigNumberish;
+};
 
 export type CancelAllAgentInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    nonce?: ProtocolBigNumberish;
-    sender: Address,
-    approvalNonce?: ProtocolBigNumberish,
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+  sender: Address;
+  approvalNonce?: ProtocolBigNumberish;
+};
 
 export type ClaimInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    nonce?: ProtocolBigNumberish;
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+};
 
 export type AgentClaimInput = {
-    assetId: ProtocolBigNumberish;
-    epoch: ProtocolBigNumberish;
-    sender: Address,
-    nonce?: ProtocolBigNumberish;
-    approvalNonce?: ProtocolBigNumberish,
-}
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  sender: Address;
+  nonce?: ProtocolBigNumberish;
+  approvalNonce?: ProtocolBigNumberish;
+};
 
 export type WithdrawalInput = {
-    amount: ProtocolBigNumberish;
-    ledger: Address;
-    nonce?: ProtocolBigNumberish;
-    receiver?: Address;
-}
+  amount: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+  receiver?: Address;
+};
 
 export type ApproveAgentInput = {
-    agent: Address;
-    approvalNonce?: ProtocolBigNumberish;
-    nonce?: ProtocolBigNumberish;
-}
+  agent: Address;
+  approvalNonce?: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+};
 
 export type RevokeAgentInput = {
-    nonce?: ProtocolBigNumberish;
-}
+  nonce?: ProtocolBigNumberish;
+};
 
 export type AgentApprovalInput = {
-    master: Address;
-    agent: Address;
-    approvalNonce: ProtocolBigNumberish;
-}
+  master: Address;
+  agent: Address;
+  approvalNonce: ProtocolBigNumberish;
+};

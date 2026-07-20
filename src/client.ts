@@ -1,4 +1,4 @@
-import { ZeroHash, type Wallet } from "ethers";
+import { ZeroHash, type TypedDataDomain, type Wallet } from "ethers";
 import {
   buildApproveAgent,
   buildAgentApproval,
@@ -23,9 +23,10 @@ import {
   type BuildClaimInput,
 } from "./builders.js";
 import { SignatureType, TimeInForce } from "./constants.js";
+import { getDefaultExchangeChainConfig } from "./config.js";
 import { HttpResponseError, createProtocolValidationError } from "./errors.js";
 import {
-  CHAIN_ID,
+  getExchangeDomain,
   hashAgentApprovalJS,
   hashApproveAgentOrderJS,
   hashCancelOrderJS,
@@ -39,21 +40,29 @@ import {
   getAssetRequestSchema,
   getBalanceRequestSchema,
   getBookOrdersRequestSchema,
+  getExchangeConfigRequestSchema,
   getOrderBookRequestSchema,
   getPositionRequestSchema,
   getTopOfBookRequestSchema,
+  parseExchangeChainConfig,
+  parseExchangeContracts,
+  toJsonExchangeChainConfig,
 } from "./schemas.js";
 import { signOrderJS } from "./signing.js";
 import type {
   Address,
   Eip712AgentApproval,
+  ExchangeContracts,
+  ExchangeContractsInput,
   GetAgentApprovalRequest,
   GetAssetRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
+  GetExchangeConfigRequest,
   GetOrderBookRequest,
   GetPositionRequest,
   GetTopOfBookRequest,
+  JsonExchangeChainConfig,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
   JsonSignedClaimMessage,
@@ -106,16 +115,22 @@ export type InfoClientOptions = HttpClientOptions;
 
 export interface ExchangeClientOptions extends HttpClientOptions {
   wallet: Wallet;
-  chainId?: ProtocolBigNumberish;
+  chainId: ProtocolBigNumberish;
+  contracts?: ExchangeContractsInput;
   infoClient?: InfoClient;
   nonceManager?: NonceManager;
 }
 
-type ExactInput<Allowed, Actual extends Allowed> =
-  Actual & Record<Exclude<keyof Actual, keyof Allowed>, never>;
+type ExactInput<Allowed, Actual extends Allowed> = Actual &
+  Record<Exclude<keyof Actual, keyof Allowed>, never>;
 
 interface AgentStatusResponse {
   nonce: ProtocolBigNumberish;
+}
+
+interface ResolvedExchangeClientConfig {
+  chainId: bigint;
+  contracts: ExchangeContracts;
 }
 
 const UINT32_MAX = 2n ** 32n - 1n;
@@ -197,6 +212,17 @@ export class InfoClient {
     return BigInt(status.nonce);
   }
 
+  async getExchangeConfig(
+    input: ProtocolInput<GetExchangeConfigRequest> | ProtocolBigNumberish,
+  ): Promise<HttpResult<JsonExchangeChainConfig>> {
+    const request = getExchangeConfigRequestSchema.parse(
+      typeof input === "object" && input !== null ? input : { chainId: input },
+    );
+    const response = await this.get(`/config/chains/${encodePathSegment(request.chainId)}`);
+    const config = parseExchangeChainConfig(response.data);
+    return { ...response, data: toJsonExchangeChainConfig(config) };
+  }
+
   private async get(path: string): Promise<HttpResult> {
     const response = await this.fetchFn(buildUrl(this.apiUrl, path), {
       method: "GET",
@@ -212,15 +238,21 @@ export class ExchangeClient {
   readonly info: InfoClient;
   private readonly fetchFn: FetchLike;
   private readonly headers: Record<string, string>;
-  private readonly chainId: ProtocolBigNumberish;
+  private readonly chainId: bigint;
+  private readonly contracts: ExchangeContracts;
+  private readonly exchangeDomain: TypedDataDomain;
   private readonly nonceManager: NonceManager;
 
   constructor(options: ExchangeClientOptions) {
+    const config = resolveExchangeClientConfig(options);
+
     this.apiUrl = normalizeApiUrl(options.apiUrl);
     this.wallet = options.wallet;
     this.fetchFn = options.fetch ?? defaultFetch;
     this.headers = options.headers ?? {};
-    this.chainId = options.chainId ?? CHAIN_ID;
+    this.chainId = config.chainId;
+    this.contracts = config.contracts;
+    this.exchangeDomain = getExchangeDomain(this.chainId, this.contracts.exchange);
     this.info =
       options.infoClient ??
       new InfoClient({
@@ -243,7 +275,7 @@ export class ExchangeClient {
       sender: this.wallet.address,
       approvalNonce: 0n,
     });
-    const orderHash = hashFillOrderJS(order);
+    const orderHash = hashFillOrderJS(order, this.exchangeDomain);
     const message = buildSignedOrderMessage({
       order,
       chainId: this.chainId,
@@ -268,7 +300,7 @@ export class ExchangeClient {
       signatureType: SignatureType.AGENT,
       approvalNonce,
     });
-    const orderHash = hashFillOrderJS(order);
+    const orderHash = hashFillOrderJS(order, this.exchangeDomain);
     const message = buildSignedOrderMessage({
       order,
       chainId: this.chainId,
@@ -294,12 +326,12 @@ export class ExchangeClient {
   }
 
   async cancelAll<const TInput extends CancelAllInput>(
-    input: ExactInput<CancelAllInput, TInput>
+    input: ExactInput<CancelAllInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     return this.cancelOrder({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      orderHash: ZeroHash
+      orderHash: ZeroHash,
     });
   }
 
@@ -323,12 +355,12 @@ export class ExchangeClient {
     return this.cancelAgentOrder({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
-      orderHash: ZeroHash
+      orderHash: ZeroHash,
     });
   }
 
   async claim<const TInput extends ClaimInput>(
-    input: ExactInput<ClaimInput, TInput>
+    input: ExactInput<ClaimInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     return this.signAndPostClaim({
       ...input,
@@ -341,7 +373,7 @@ export class ExchangeClient {
   }
 
   async claimAgent<const TInput extends AgentClaimInput>(
-      input: ExactInput<AgentClaimInput, TInput>
+    input: ExactInput<AgentClaimInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     const approvalNonce =
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
@@ -360,13 +392,13 @@ export class ExchangeClient {
     const withdrawal = buildWithdrawal({
       ...input,
       receiver: input.receiver ?? this.wallet.address,
-      ledger: input.ledger,// TODO: this has to come from the info client? Maybe get request? Or set when initialized
+      ledger: this.contracts.ledger,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: this.wallet.address,
       signatureType: SignatureType.EOA,
       sender: this.wallet.address,
     });
-    const orderHash = hashWithdrawalOrderJS(withdrawal);
+    const orderHash = hashWithdrawalOrderJS(withdrawal, this.exchangeDomain);
     const message = buildSignedWithdrawalMessage({
       withdrawal,
       chainId: this.chainId,
@@ -382,13 +414,14 @@ export class ExchangeClient {
     input: ExactInput<ApproveAgentInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedApproveAgentMessage>> {
     const sender = this.wallet.address;
-    const approvalNonce = input.approvalNonce ?? BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000));
-    const approvalSignature =
-      this.signAgentApproval({
-        master: sender,
-        agent: input.agent,
-        approvalNonce,
-      });
+    const approvalNonce =
+      input.approvalNonce ??
+      BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000));
+    const approvalSignature = this.signAgentApproval({
+      master: sender,
+      agent: input.agent,
+      approvalNonce,
+    });
     const approval = buildApproveAgent({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
@@ -398,7 +431,7 @@ export class ExchangeClient {
       approvalSignature,
       approvalNonce,
     });
-    const orderHash = hashApproveAgentOrderJS(approval);
+    const orderHash = hashApproveAgentOrderJS(approval, this.exchangeDomain);
     const message = buildSignedApproveAgentMessage({
       approval,
       chainId: this.chainId,
@@ -420,7 +453,7 @@ export class ExchangeClient {
       signatureType: SignatureType.EOA,
       sender: this.wallet.address,
     });
-    const orderHash = hashRevokeAgentOrderJS(revocation);
+    const orderHash = hashRevokeAgentOrderJS(revocation, this.exchangeDomain);
     const message = buildSignedRevokeAgentMessage({
       revocation,
       chainId: this.chainId,
@@ -434,7 +467,7 @@ export class ExchangeClient {
 
   signAgentApproval(approval: AgentApprovalInput): string {
     const parsedApproval: Eip712AgentApproval = buildAgentApproval(approval);
-    const approvalHash = hashAgentApprovalJS(parsedApproval);
+    const approvalHash = hashAgentApprovalJS(parsedApproval, this.exchangeDomain);
     return signOrderJS(approvalHash, this.wallet);
   }
 
@@ -442,7 +475,7 @@ export class ExchangeClient {
     input: BuildCancelInput,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     const cancel = buildCancel(input);
-    const orderHash = hashCancelOrderJS(cancel);
+    const orderHash = hashCancelOrderJS(cancel, this.exchangeDomain);
     const message = buildSignedCancelMessage({
       cancel,
       chainId: this.chainId,
@@ -458,7 +491,7 @@ export class ExchangeClient {
     input: BuildClaimInput,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     const claim = buildClaim(input);
-    const orderHash = hashClaimOrderJS(claim);
+    const orderHash = hashClaimOrderJS(claim, this.exchangeDomain);
     const message = buildSignedClaimMessage({
       claim,
       chainId: this.chainId,
@@ -505,6 +538,31 @@ function buildUrl(apiUrl: string, path: string): string {
 
 function encodePathSegment(value: string | bigint): string {
   return encodeURIComponent(value.toString());
+}
+
+function resolveExchangeClientConfig(options: ExchangeClientOptions): ResolvedExchangeClientConfig {
+  const chainId = parseChainId(options.chainId);
+  if (options.contracts !== undefined) {
+    return {
+      chainId,
+      contracts: parseExchangeContracts(options.contracts),
+    };
+  }
+
+  const config = getDefaultExchangeChainConfig(chainId);
+  if (config === undefined) {
+    throw createProtocolValidationError(
+      "invalid_value",
+      "$.chainId",
+      "no default exchange config for chainId; provide contracts",
+    );
+  }
+
+  return config;
+}
+
+function parseChainId(input: ProtocolBigNumberish): bigint {
+  return getExchangeConfigRequestSchema.parse({ chainId: input }).chainId;
 }
 
 const defaultFetch: FetchLike = async (url, init) => {

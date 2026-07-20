@@ -655,197 +655,162 @@ function getInvalidateStructHash(order: Eip712Invalidate): string {
   );
 }
 
-export function hashInvalidateOrderJS(order: Eip712Invalidate): string {
+export function hashInvalidateOrderJS(
+  order: Eip712Invalidate,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getInvalidateStructHash(order);
-  return hashTypedDataStruct(structHash);
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashRevokeAgentOrderJS(order: Eip712RevokeAgent): string {
+export function hashRevokeAgentOrderJS(
+  order: Eip712RevokeAgent,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getRevokeAgentOrderStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashApproveAgentOrderJS(order: Eip712ApproveAgent): string {
+export function hashApproveAgentOrderJS(
+  order: Eip712ApproveAgent,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getApproveAgentOrderStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashAgentApprovalJS(order: Eip712AgentApproval): string {
+export function hashAgentApprovalJS(
+  order: Eip712AgentApproval,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getAgentApprovalStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashPauseOrderEntryJS(order: PauseEntry): string {
+export function hashPauseOrderEntryJS(
+  order: PauseEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getPauseEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashPauseOrderJS(order: Eip712Pause): string {
+export function hashPauseOrderJS(
+  order: Eip712Pause,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getPauseStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashOnchainDepositOrderEntryJS(order: OnchainDepositEntry): string {
+export function hashOnchainDepositOrderEntryJS(
+  order: OnchainDepositEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getOnchainDepositEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashOnchainDepositOrderJS(order: Eip712OnchainDeposit): string {
+export function hashOnchainDepositOrderJS(
+  order: Eip712OnchainDeposit,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getOnchainDepositStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashDepositOrderEntryJS(order: DepositEntry): string {
+export function hashDepositOrderEntryJS(
+  order: DepositEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getDepositEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashDepositOrderJS(order: Eip712Deposit): string {
+export function hashDepositOrderJS(
+  order: Eip712Deposit,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getDepositStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashWithdrawalOrderEntryJS(order: WithdrawalEntry): string {
+export function hashWithdrawalOrderEntryJS(
+  order: WithdrawalEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getWithdrawalEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashWithdrawalOrderJS(order: Eip712Withdrawal): string {
+export function hashWithdrawalOrderJS(
+  order: Eip712Withdrawal,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getWithdrawalStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashFillOrderEntryJS(order: FillEntry): string {
+export function hashFillOrderEntryJS(
+  order: FillEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getFillEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashFillOrderJS(order: Eip712Order): string {
+export function hashFillOrderJS(
+  order: Eip712Order,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getFillStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashCancelOrderEntryJS(order: CancelEntry): string {
+export function hashCancelOrderEntryJS(
+  order: CancelEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getCancelEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashCancelOrderJS(order: Eip712Cancel): string {
+export function hashCancelOrderJS(
+  order: Eip712Cancel,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getCancelStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashClaimOrderEntryJS(order: ClaimEntry): string {
+export function hashClaimOrderEntryJS(
+  order: ClaimEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getClaimEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashClaimOrderJS(order: Eip712Claim): string {
+export function hashClaimOrderJS(
+  order: Eip712Claim,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getClaimStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashResolutionOrderEntry(order: ResolutionEntry): string {
+export function hashResolutionOrderEntry(
+  order: ResolutionEntry,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getResolutionEntryStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }
 
-export function hashResolutionOrderJS(order: Eip712Resolution): string {
+export function hashResolutionOrderJS(
+  order: Eip712Resolution,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
   const structHash = getResolutionStructHash(order);
-  const domainSeparator = getDomainSeparator();
-
-  // "\x19\x01" || domainSeparator || structHash
-  return keccak256(
-    solidityPacked(["string", "bytes32", "bytes32"], ["\x19\x01", domainSeparator, structHash]),
-  );
+  return hashTypedDataStruct(structHash, domain);
 }

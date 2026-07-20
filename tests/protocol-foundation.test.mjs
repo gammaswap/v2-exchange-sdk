@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as builders from "@gammaswap/v2-exchange-sdk/builders";
+import { getDefaultExchangeChainConfig } from "@gammaswap/v2-exchange-sdk/config";
 import { OrderType, SignatureType } from "@gammaswap/v2-exchange-sdk/constants";
 import { ProtocolValidationError } from "@gammaswap/v2-exchange-sdk/errors";
 import * as schemas from "@gammaswap/v2-exchange-sdk/schemas";
@@ -11,6 +12,9 @@ const AGENT = "0x0000000000000000000000000000000000000003";
 const TOKEN = "0x0000000000000000000000000000000000000004";
 const LEDGER = "0x0000000000000000000000000000000000000005";
 const RECEIVER = "0x0000000000000000000000000000000000000006";
+const EXCHANGE = "0x0000000000000000000000000000000000000007";
+const DEPOSIT_LEDGER = "0x0000000000000000000000000000000000000008";
+const PERMIT2 = "0x0000000000000000000000000000000000000009";
 const ORDER_HASH = `0x${"11".repeat(32)}`;
 const SIGNATURE = `0x${"22".repeat(65)}`;
 const PERMIT_SIGNATURE = `0x${"33".repeat(65)}`;
@@ -118,6 +122,17 @@ const agentApprovalJson = {
   agent: AGENT,
   approvalNonce: "7",
   approvalSignature: "0x",
+};
+
+const exchangeConfigJson = {
+  chainId: "31337",
+  contracts: {
+    exchange: EXCHANGE,
+    ledger: LEDGER,
+    depositLedger: DEPOSIT_LEDGER,
+    settlementToken: TOKEN,
+    permit2: PERMIT2,
+  },
 };
 
 const actionCases = [
@@ -330,6 +345,31 @@ test("agent approval schema parses and serializes its canonical shape", () => {
   assert.deepEqual(builders.buildAgentApprovalJson(agentApprovalJson), agentApprovalJson);
 });
 
+test("exchange chain config schema parses and serializes configured addresses", () => {
+  const parsed = schemas.parseExchangeChainConfig(exchangeConfigJson);
+
+  assert.equal(parsed.chainId, 31337n);
+  assert.equal(parsed.contracts.exchange, EXCHANGE);
+  assert.equal(parsed.contracts.ledger, LEDGER);
+  assert.equal(parsed.contracts.depositLedger, DEPOSIT_LEDGER);
+  assert.equal(parsed.contracts.settlementToken, TOKEN);
+  assert.equal(parsed.contracts.permit2, PERMIT2);
+  assert.deepEqual(schemas.toJsonExchangeChainConfig(parsed), exchangeConfigJson);
+});
+
+test("default exchange chain config returns cloned hard-coded localhost contracts", () => {
+  const first = getDefaultExchangeChainConfig("31337");
+  const second = getDefaultExchangeChainConfig(31337n);
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(first.chainId, 31337n);
+  assert.equal(first.contracts.exchange, "0x749d20D85555330d20862770b58a72939285c42a");
+  assert.equal(first.contracts.depositLedger, "0xCF9C83be89ac927F9D98F0CaFB9ED7fDea2fD459");
+  assert.notEqual(first, second);
+  assert.notEqual(first.contracts, second.contracts);
+});
+
 test("builders set canonical action type and accept bigint or decimal string inputs", () => {
   for (const actionCase of actionCases) {
     const built = actionCase.build({ ...withoutTyp(actionCase.json), typ: "999" });
@@ -453,5 +493,8 @@ test("unsigned request schemas parse examples from the request surface", () => {
   );
   assert.deepEqual(schemas.getAgentApprovalRequestSchema.parse({ account: ACCOUNT }), {
     account: ACCOUNT,
+  });
+  assert.deepEqual(schemas.getExchangeConfigRequestSchema.parse({ chainId: "31337" }), {
+    chainId: 31337n,
   });
 });

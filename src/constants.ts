@@ -22,6 +22,12 @@ export const OrderType = {
   AGENT_REVOKE: 62n,
 };
 
+export const ChainId = {
+  BASE: 8453n,
+  BASE_SEPOLIA: 84532n,
+  LOCALHOST: 31337n,
+} as const;
+
 export const TimeInForce = {
   GTC: 0n,
   FOK: 1n,

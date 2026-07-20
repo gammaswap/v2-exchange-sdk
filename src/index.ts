@@ -3,6 +3,7 @@ export * from "./schemas.js";
 export * from "./signing.js";
 export * from "./hashing.js";
 export * from "./builders.js";
+export * from "./config.js";
 export * from "./client.js";
 export * from "./websocket.js";
 export * from "./errors.js";
