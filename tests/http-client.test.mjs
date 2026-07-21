@@ -458,6 +458,32 @@ test("ExchangeClient rejects approveAgent approvalNonce values outside the allow
   }
 });
 
+test("ExchangeClient rejects approveAgent when agent is the master address before posting", async () => {
+  const mock = createFetchMock(() => ({ data: { accepted: true } }));
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    fetch: mock.fetch,
+  });
+
+  await assert.rejects(
+    () =>
+      client.approveAgent({
+        agent: MASTER.toLowerCase(),
+        approvalNonce: futureApprovalNonce(),
+      }),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_value");
+      assert.equal(error.issues[0]?.path, "$.agent");
+      return true;
+    },
+  );
+
+  assert.equal(mock.calls.length, 0);
+});
+
 test("ExchangeClient rejects invalid agent status nonce before posting agent action", async () => {
   const mock = createFetchMock(() => ({ data: { nonce: 42 } }));
   const client = createExchangeClient({

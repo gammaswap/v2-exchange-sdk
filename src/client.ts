@@ -430,6 +430,13 @@ export class ExchangeClient {
       input.approvalNonce ??
         BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000)) / 1000n,
     );
+    if (isSameAddress(input.agent, sender)) {
+      throw createProtocolValidationError(
+        "invalid_value",
+        "$.agent",
+        "agent must be different from master",
+      );
+    }
     const approvalSignature = this.signAgentApproval({
       master: sender,
       agent: input.agent,
@@ -704,4 +711,8 @@ function parseApprovalNonceInteger(input: unknown, path: string): bigint {
   }
 
   return value;
+}
+
+function isSameAddress(left: unknown, right: string): boolean {
+  return typeof left === "string" && left.toLowerCase() === right.toLowerCase();
 }
