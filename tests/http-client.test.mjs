@@ -28,6 +28,14 @@ const ORDER_HASH = `0x${"33".repeat(32)}`;
 const AGENT_APPROVAL_NONCE = "1780272001";
 const MIN_AGENT_APPROVAL_NONCE = "1780272000";
 
+function currentSeconds() {
+  return BigInt(Math.floor(Date.now() / 1000));
+}
+
+function futureApprovalNonce(offsetSeconds = 60n) {
+  return (currentSeconds() + offsetSeconds).toString();
+}
+
 function createFetchMock(handler) {
   const calls = [];
   const fetch = async (url, init = {}) => {
@@ -194,7 +202,7 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   const approval = await client.approveAgent({
     nonce: "5",
     agent: AGENT,
-    approvalNonce: "42",
+    approvalNonce: futureApprovalNonce(),
   });
   const revocation = await client.revokeAgent({ nonce: "6" });
 
@@ -413,6 +421,41 @@ test("ExchangeClient rejects agent action approvalNonce values at or below the m
   }
 
   assert.equal(mock.calls.length, 0);
+});
+
+test("ExchangeClient rejects approveAgent approvalNonce values outside the allowed future window before posting", async () => {
+  const originalDateNow = Date.now;
+  Date.now = () => 1_800_000_000_000;
+  try {
+    const mock = createFetchMock(() => ({ data: { accepted: true } }));
+    const client = createExchangeClient({
+      apiUrl: "http://localhost:3000",
+      wallet: WALLET,
+      chainId: "31337",
+      fetch: mock.fetch,
+    });
+
+    const now = currentSeconds();
+    for (const approvalNonce of [now + 10n, now + 300n, now + 301n, 42n]) {
+      await assert.rejects(
+        () =>
+          client.approveAgent({
+            agent: AGENT,
+            approvalNonce: approvalNonce.toString(),
+          }),
+        (error) => {
+          assert.ok(error instanceof ProtocolValidationError);
+          assert.equal(error.issues[0]?.code, "invalid_value");
+          assert.equal(error.issues[0]?.path, "$.approvalNonce");
+          return true;
+        },
+      );
+    }
+
+    assert.equal(mock.calls.length, 0);
+  } finally {
+    Date.now = originalDateNow;
+  }
 });
 
 test("ExchangeClient rejects invalid agent status nonce before posting agent action", async () => {

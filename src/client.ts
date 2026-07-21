@@ -136,6 +136,8 @@ interface ResolvedExchangeClientConfig {
 
 const UINT32_MAX = 2n ** 32n - 1n;
 const MIN_AGENT_ACTION_APPROVAL_NONCE = 1_780_272_000n;
+const APPROVE_AGENT_MIN_FUTURE_SECONDS = 10n;
+const APPROVE_AGENT_MAX_FUTURE_SECONDS = 5n * 60n;
 const DECIMAL_STRING_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 export class InfoClient {
@@ -424,9 +426,10 @@ export class ExchangeClient {
     input: ExactInput<ApproveAgentInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedApproveAgentMessage>> {
     const sender = this.wallet.address;
-    const approvalNonce =
+    const approvalNonce = parseApproveAgentApprovalNonce(
       input.approvalNonce ??
-      BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000)) / 1000n;
+        BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000)) / 1000n,
+    );
     const approvalSignature = this.signAgentApproval({
       master: sender,
       agent: input.agent,
@@ -640,6 +643,37 @@ function parseAgentStatusResponse(data: unknown): AgentStatusResponse {
 }
 
 function parseAgentActionApprovalNonce(input: unknown, path = "$.approvalNonce"): bigint {
+  const value = parseApprovalNonceInteger(input, path);
+
+  if (value <= MIN_AGENT_ACTION_APPROVAL_NONCE) {
+    throw createProtocolValidationError(
+      "invalid_value",
+      path,
+      `approvalNonce must be greater than ${MIN_AGENT_ACTION_APPROVAL_NONCE.toString()}`,
+    );
+  }
+
+  return value;
+}
+
+function parseApproveAgentApprovalNonce(input: unknown, path = "$.approvalNonce"): bigint {
+  const value = parseApprovalNonceInteger(input, path);
+  const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+  const minApprovalNonce = nowSeconds + APPROVE_AGENT_MIN_FUTURE_SECONDS;
+  const maxApprovalNonce = nowSeconds + APPROVE_AGENT_MAX_FUTURE_SECONDS;
+
+  if (value <= minApprovalNonce || value >= maxApprovalNonce) {
+    throw createProtocolValidationError(
+      "invalid_value",
+      path,
+      `approvalNonce must be greater than ${minApprovalNonce.toString()} and less than ${maxApprovalNonce.toString()}`,
+    );
+  }
+
+  return value;
+}
+
+function parseApprovalNonceInteger(input: unknown, path: string): bigint {
   let value: bigint;
 
   if (typeof input === "bigint") {
@@ -666,14 +700,6 @@ function parseAgentActionApprovalNonce(input: unknown, path = "$.approvalNonce")
       "integer_out_of_range",
       path,
       `approvalNonce must be in range 0..${UINT32_MAX.toString()}`,
-    );
-  }
-
-  if (value <= MIN_AGENT_ACTION_APPROVAL_NONCE) {
-    throw createProtocolValidationError(
-      "invalid_value",
-      path,
-      `approvalNonce must be greater than ${MIN_AGENT_ACTION_APPROVAL_NONCE.toString()}`,
     );
   }
 
