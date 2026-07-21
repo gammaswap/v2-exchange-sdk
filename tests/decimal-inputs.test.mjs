@@ -49,11 +49,13 @@ test("amount input parser converts decimal amounts to six-decimal protocol units
   assert.equal(parseAmountInput("0"), 0n);
   assert.equal(parseAmountInput("0.01"), 10_000n);
   assert.equal(parseAmountInput("100.25"), 100_250_000n);
+  assert.equal(parseAmountInput("1000000000.00"), 1_000_000_000_000_000n);
 });
 
 test("amount input parser rejects invalid amount inputs", () => {
   assertProtocolError(() => parseAmountInput(1), "invalid_type", "$.amount");
   assertProtocolError(() => parseAmountInput("01"), "invalid_decimal_string", "$.amount");
   assertProtocolError(() => parseAmountInput("1.001"), "invalid_decimal_string", "$.amount");
+  assertProtocolError(() => parseAmountInput("1000000000.01"), "invalid_value", "$.amount");
   assertProtocolError(() => parsePositiveAmountInput("0"), "invalid_value", "$.amount");
 });

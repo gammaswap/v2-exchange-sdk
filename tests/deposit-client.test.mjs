@@ -22,6 +22,7 @@ test("settlement token amount parser converts decimal strings to six-decimal bas
   assert.equal(parseSettlementTokenAmount("100"), 100_000_000n);
   assert.equal(parseSettlementTokenAmount("100.25"), 100_250_000n);
   assert.equal(parseSettlementTokenAmount("0.01"), 10_000n);
+  assert.equal(parseSettlementTokenAmount("1000000000.00"), 1_000_000_000_000_000n);
   assert.equal(parseSettlementTokenAmount("0"), 0n);
 });
 
@@ -31,6 +32,7 @@ test("settlement token amount parser rejects unsafe amount inputs", () => {
   assertProtocolError(() => parseSettlementTokenAmount("1.001"), "invalid_decimal_string");
   assertProtocolError(() => parseSettlementTokenAmount("-1"), "invalid_decimal_string");
   assertProtocolError(() => parseSettlementTokenAmount("1", 18), "invalid_value");
+  assertProtocolError(() => parseSettlementTokenAmount("1000000000.01"), "invalid_value");
 });
 
 test("DepositClient resolves the default localhost DepositLedger address", () => {

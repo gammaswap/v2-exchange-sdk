@@ -376,6 +376,15 @@ test("ExchangeClient rejects invalid signed action fields before posting", async
       return true;
     },
   );
+  await assert.rejects(
+    () => client.withdraw({ amount: "1000000000.01" }),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_value");
+      assert.equal(error.issues[0]?.path, "$.amount");
+      return true;
+    },
+  );
   assert.equal(mock.calls.length, 0);
 });
 

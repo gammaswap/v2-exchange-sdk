@@ -9,6 +9,7 @@ export const MIN_PRICE_PROTOCOL_UNITS = 1_000n;
 export const MAX_PRICE_PROTOCOL_UNITS = 999_000n;
 export const MIN_SIZE_PROTOCOL_UNITS = 10_000n;
 export const MAX_SIZE_PROTOCOL_UNITS = 1_000_000_000_000_000n;
+export const MAX_AMOUNT_PROTOCOL_UNITS = MAX_SIZE_PROTOCOL_UNITS;
 
 const PROTOCOL_SCALE = 1_000_000n;
 const UINT256_MAX = 2n ** 256n - 1n;
@@ -53,7 +54,18 @@ export function parseSizeInput(input: HumanDecimalString, path = "$.size"): bigi
 }
 
 export function parseAmountInput(input: HumanDecimalString, path = "$.amount"): bigint {
-  return parseDecimalInputToProtocolUnits(input, path, "amount", SIZE_AMOUNT_INPUT_DECIMALS);
+  const amount = parseDecimalInputToProtocolUnits(
+    input,
+    path,
+    "amount",
+    SIZE_AMOUNT_INPUT_DECIMALS,
+  );
+
+  if (amount > MAX_AMOUNT_PROTOCOL_UNITS) {
+    throw createProtocolValidationError("invalid_value", path, "amount must be at most 1000000000");
+  }
+
+  return amount;
 }
 
 export function parsePositiveAmountInput(input: HumanDecimalString, path = "$.amount"): bigint {
