@@ -24,6 +24,7 @@ import {
 } from "./builders.js";
 import { SignatureType, TimeInForce } from "./constants.js";
 import { getDefaultExchangeChainConfig } from "./config.js";
+import { parsePositiveAmountInput, parsePriceInput, parseSizeInput } from "./decimal-inputs.js";
 import { HttpResponseError, createProtocolValidationError } from "./errors.js";
 import {
   getExchangeDomain,
@@ -268,6 +269,8 @@ export class ExchangeClient {
   ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const order = buildOrder({
       ...input,
+      price: parsePriceInput(input.price),
+      size: parseSizeInput(input.size),
       timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: this.wallet.address,
@@ -294,6 +297,8 @@ export class ExchangeClient {
       input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
     const order = buildOrder({
       ...input,
+      price: parsePriceInput(input.price),
+      size: parseSizeInput(input.size),
       timeInForce: input.timeInForce ?? TimeInForce.GTC,
       nonce: input.nonce ?? this.nonceManager.next(),
       signer: this.wallet.address,
@@ -391,6 +396,7 @@ export class ExchangeClient {
   ): Promise<ExchangeActionResult<JsonSignedWithdrawalMessage>> {
     const withdrawal = buildWithdrawal({
       ...input,
+      amount: parsePositiveAmountInput(input.amount),
       receiver: input.receiver ?? this.wallet.address,
       ledger: this.contracts.ledger,
       nonce: input.nonce ?? this.nonceManager.next(),

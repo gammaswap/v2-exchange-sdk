@@ -11,17 +11,18 @@ import {
   type Wallet,
 } from "ethers";
 import { getDefaultExchangeChainConfig } from "./config.js";
+import { parseAmountInput, parsePositiveAmountInput } from "./decimal-inputs.js";
 import { createProtocolValidationError, ExchangeSdkError } from "./errors.js";
 import { getExchangeConfigRequestSchema, parseExchangeContracts } from "./schemas.js";
 import type {
   Address,
-  DecimalString,
   ExchangeContractsInput,
+  HumanDecimalString,
   HexString,
   ProtocolBigNumberish,
 } from "./types.js";
 
-export type SettlementAmountInput = DecimalString;
+export type SettlementAmountInput = HumanDecimalString;
 
 export interface DepositClientOptions {
   rpcUrl: string;
@@ -79,7 +80,6 @@ export interface DepositTransactionResult extends OnchainTransactionResult {
 const SETTLEMENT_TOKEN_DECIMALS = 6;
 const UINT256_MAX = 2n ** 256n - 1n;
 const DECIMAL_INTEGER_PATTERN = /^(0|[1-9][0-9]*)$/;
-const DECIMAL_AMOUNT_PATTERN = /^(0|[1-9][0-9]*)(?:\.([0-9]+))?$/;
 const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
 
 const DEPOSIT_LEDGER_ABI = [
@@ -165,7 +165,7 @@ export class DepositClient {
 
     this.chainId = getExchangeConfigRequestSchema.parse({ chainId: options.chainId }).chainId;
     this.depositLedger = resolveDepositLedger(options, this.chainId);
-    this.settlementTokenDecimals = parseTokenDecimals(
+    this.settlementTokenDecimals = parseSettlementTokenDecimals(
       options.settlementTokenDecimals ?? SETTLEMENT_TOKEN_DECIMALS,
     );
     this.rpcUrl = options.rpcUrl;
@@ -266,14 +266,14 @@ export class DepositClient {
 
   async deposit(input: DepositTransactionInput): Promise<DepositTransactionResult> {
     await this.assertRpcChainId();
-    const amount = parsePositiveAmount(this.parseAmount(input.amount), "$.amount");
+    const amount = parsePositiveAmountInput(input.amount);
     const tx = await this.depositLedgerContract.deposit(amount);
     return this.waitForDeposit(tx, amount, input.confirmations, input.logTxId);
   }
 
   async signDepositPermit(input: DepositPermitInput): Promise<DepositPermit> {
     await this.assertRpcChainId();
-    const amount = parsePositiveAmount(this.parseAmount(input.amount), "$.amount");
+    const amount = parsePositiveAmountInput(input.amount);
     const nonce = parseUnsignedInteger(input.nonce, "$.nonce", UINT256_MAX);
     const deadline = parseUnsignedInteger(input.deadline, "$.deadline", UINT256_MAX);
     const owner = validateAddress(input.owner ?? this.wallet.address, "$.owner");
@@ -320,7 +320,7 @@ export class DepositClient {
         ? await this.signDepositPermit(input)
         : {
             owner: validateAddress(input.owner ?? this.wallet.address, "$.owner"),
-            amount: parsePositiveAmount(this.parseAmount(input.amount), "$.amount"),
+            amount: parsePositiveAmountInput(input.amount),
             nonce: parseUnsignedInteger(input.nonce, "$.nonce", UINT256_MAX),
             deadline: parseUnsignedInteger(input.deadline, "$.deadline", UINT256_MAX),
             signature: validateHexData(input.signature, "$.signature"),
@@ -337,7 +337,7 @@ export class DepositClient {
   }
 
   parseAmount(amount: SettlementAmountInput): bigint {
-    return parseSettlementTokenAmount(amount, this.settlementTokenDecimals);
+    return parseSettlementTokenAmount(amount);
   }
 
   private async getSettlementTokenContract(): Promise<Erc20Contract> {
@@ -385,47 +385,8 @@ export function parseSettlementTokenAmount(
   amount: SettlementAmountInput,
   decimals: number = SETTLEMENT_TOKEN_DECIMALS,
 ): bigint {
-  const parsedDecimals = parseTokenDecimals(decimals);
-
-  if (typeof amount !== "string") {
-    throw createProtocolValidationError(
-      "invalid_type",
-      "$.amount",
-      "expected a decimal amount string",
-    );
-  }
-
-  const match = DECIMAL_AMOUNT_PATTERN.exec(amount);
-  if (match === null) {
-    throw createProtocolValidationError(
-      "invalid_decimal_string",
-      "$.amount",
-      "expected a canonical unsigned decimal amount string",
-    );
-  }
-
-  const whole = match[1] ?? "0";
-  const fraction = match[2] ?? "";
-  if (fraction.length > parsedDecimals) {
-    throw createProtocolValidationError(
-      "invalid_decimal_string",
-      "$.amount",
-      `amount has more than ${parsedDecimals.toString()} decimal places`,
-    );
-  }
-
-  const paddedFraction = fraction.padEnd(parsedDecimals, "0");
-  const value = BigInt(whole) * 10n ** BigInt(parsedDecimals) + BigInt(paddedFraction || "0");
-
-  if (value > UINT256_MAX) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      "$.amount",
-      `expected integer in range 0..${UINT256_MAX.toString()}`,
-    );
-  }
-
-  return value;
+  parseSettlementTokenDecimals(decimals);
+  return parseAmountInput(amount);
 }
 
 function resolveDepositLedger(options: DepositClientOptions, chainId: bigint): Address {
@@ -503,20 +464,12 @@ function parseUnsignedInteger(input: unknown, path: string, max: bigint): bigint
   return value;
 }
 
-function parsePositiveAmount(amount: bigint, path: string): bigint {
-  if (amount <= 0n) {
-    throw createProtocolValidationError("invalid_value", path, "amount must be greater than zero");
-  }
-
-  return amount;
-}
-
-function parseTokenDecimals(decimals: number): number {
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+function parseSettlementTokenDecimals(decimals: number): number {
+  if (decimals !== SETTLEMENT_TOKEN_DECIMALS) {
     throw createProtocolValidationError(
       "invalid_value",
       "$.settlementTokenDecimals",
-      "settlementTokenDecimals must be an integer in range 0..255",
+      "settlementTokenDecimals must be 6",
     );
   }
 

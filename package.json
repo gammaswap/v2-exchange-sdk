@@ -28,6 +28,10 @@
       "types": "./dist/constants.d.ts",
       "import": "./dist/constants.js"
     },
+    "./decimal-inputs": {
+      "types": "./dist/decimal-inputs.d.ts",
+      "import": "./dist/decimal-inputs.js"
+    },
     "./deposit-client": {
       "types": "./dist/deposit-client.d.ts",
       "import": "./dist/deposit-client.js"

@@ -1,5 +1,6 @@
 export type Address = string;
 export type DecimalString = string;
+export type HumanDecimalString = string;
 export type HexString = string;
 export type ProtocolBigNumberish = bigint | DecimalString;
 
@@ -437,8 +438,8 @@ export type PlaceOrderInput = {
   assetId: ProtocolBigNumberish;
   epoch: ProtocolBigNumberish;
   side: boolean;
-  price: ProtocolBigNumberish;
-  size: ProtocolBigNumberish;
+  price: HumanDecimalString;
+  size: HumanDecimalString;
   timeInForce?: ProtocolBigNumberish;
   nonce?: ProtocolBigNumberish;
 };
@@ -447,8 +448,8 @@ export type PlaceAgentOrderInput = {
   assetId: ProtocolBigNumberish;
   epoch: ProtocolBigNumberish;
   side: boolean;
-  price: ProtocolBigNumberish;
-  size: ProtocolBigNumberish;
+  price: HumanDecimalString;
+  size: HumanDecimalString;
   timeInForce?: ProtocolBigNumberish;
   nonce?: ProtocolBigNumberish;
   sender: Address;
@@ -500,7 +501,7 @@ export type AgentClaimInput = {
 };
 
 export type WithdrawalInput = {
-  amount: ProtocolBigNumberish;
+  amount: HumanDecimalString;
   nonce?: ProtocolBigNumberish;
   receiver?: Address;
 };

@@ -64,8 +64,8 @@ function baseOrderInput(overrides = {}) {
     epoch: "2",
     side: OrderSide.BUY,
     assetId: "123456789012345678901234567890",
-    size: "1000000",
-    price: "500000",
+    size: "1",
+    price: "50",
     timeInForce: TimeInForce.GTC,
     ...overrides,
   };
@@ -187,7 +187,7 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   const withdrawal = await client.withdraw({
     nonce: "4",
     receiver: RECEIVER,
-    amount: "1000000",
+    amount: "1",
   });
   const approval = await client.approveAgent({
     nonce: "5",
@@ -211,6 +211,8 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   assert.equal(order.request.order.signer, MASTER);
   assert.equal(order.request.order.sender, MASTER);
   assert.equal(order.request.order.signatureType, SignatureType.EOA.toString());
+  assert.equal(order.request.order.size, "1000000");
+  assert.equal(order.request.order.price, "500000");
   assert.equal(typeof order.request.order.nonce, "string");
   assert.equal(
     order.request.orderHash,
@@ -222,6 +224,7 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   assert.ok(validateSignatureJS(cancel.request.orderHash, cancel.request.signature, MASTER));
   assert.ok(validateSignatureJS(claim.request.orderHash, claim.request.signature, MASTER));
   assert.equal(withdrawal.request.withdrawal.ledger, LEDGER);
+  assert.equal(withdrawal.request.withdrawal.amount, "1000000");
   assert.equal(approval.request.approval.approvalSignature.startsWith("0x"), true);
   assert.notEqual(approval.request.approval.approvalSignature, "0x");
   assert.ok(validateSignatureJS(approval.request.orderHash, approval.request.signature, MASTER));
@@ -287,7 +290,7 @@ test("ExchangeClient uses hard-coded localhost contracts when no contracts are p
   const withdrawal = await client.withdraw({
     nonce: "4",
     receiver: RECEIVER,
-    amount: "1000000",
+    amount: "1",
   });
 
   assert.equal(withdrawal.request.withdrawal.ledger, defaultConfig.contracts.ledger);
@@ -356,8 +359,22 @@ test("ExchangeClient rejects invalid signed action fields before posting", async
   });
 
   await assert.rejects(
-    () => client.placeOrder(baseOrderInput({ price: 1 })),
-    ProtocolValidationError,
+    () => client.placeOrder(baseOrderInput({ price: "99.89" })),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_decimal_string");
+      assert.equal(error.issues[0]?.path, "$.price");
+      return true;
+    },
+  );
+  await assert.rejects(
+    () => client.withdraw({ amount: "0" }),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_value");
+      assert.equal(error.issues[0]?.path, "$.amount");
+      return true;
+    },
   );
   assert.equal(mock.calls.length, 0);
 });
