@@ -521,3 +521,27 @@ export type AgentApprovalInput = {
   agent: Address;
   approvalNonce: ProtocolBigNumberish;
 };
+
+export type DepositTransactionInput = {
+    amount: HumanDecimalString;
+    confirmations?: number;
+    logTxId?: boolean;
+}
+
+export type TokenApprovalInput = {
+    amount: HumanDecimalString;
+    confirmations?: number;
+}
+
+export type DepositPermitInput = {
+    amount: HumanDecimalString;
+    nonce: ProtocolBigNumberish;
+    deadline: ProtocolBigNumberish;
+    owner?: Address;
+}
+
+export type DepositWithPermitInput = {
+    signature?: HexString;
+    confirmations?: number;
+    logTxId?: boolean;
+} & DepositPermitInput

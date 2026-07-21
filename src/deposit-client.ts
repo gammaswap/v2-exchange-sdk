@@ -20,9 +20,11 @@ import type {
   HumanDecimalString,
   HexString,
   ProtocolBigNumberish,
+  TokenApprovalInput,
+  DepositTransactionInput,
+  DepositPermitInput,
+  DepositWithPermitInput,
 } from "./types.js";
-
-export type SettlementAmountInput = HumanDecimalString;
 
 export interface DepositClientOptions {
   rpcUrl: string;
@@ -31,30 +33,6 @@ export interface DepositClientOptions {
   depositLedger?: Address;
   contracts?: ExchangeContractsInput;
   settlementTokenDecimals?: number;
-}
-
-export interface DepositTransactionInput {
-  amount: SettlementAmountInput;
-  confirmations?: number;
-  logTxId?: boolean;
-}
-
-export interface TokenApprovalInput {
-  amount: SettlementAmountInput;
-  confirmations?: number;
-}
-
-export interface DepositPermitInput {
-  amount: SettlementAmountInput;
-  nonce: ProtocolBigNumberish;
-  deadline: ProtocolBigNumberish;
-  owner?: Address;
-}
-
-export interface DepositWithPermitInput extends DepositPermitInput {
-  signature?: HexString;
-  confirmations?: number;
-  logTxId?: boolean;
 }
 
 export interface DepositPermit {
@@ -336,7 +314,7 @@ export class DepositClient {
     return this.waitForDeposit(tx, permit.amount, input.confirmations, input.logTxId);
   }
 
-  parseAmount(amount: SettlementAmountInput): bigint {
+  parseAmount(amount: HumanDecimalString): bigint {
     return parseSettlementTokenAmount(amount);
   }
 
@@ -382,7 +360,7 @@ export function createDepositClient(options: DepositClientOptions): DepositClien
 }
 
 export function parseSettlementTokenAmount(
-  amount: SettlementAmountInput,
+  amount: HumanDecimalString,
   decimals: number = SETTLEMENT_TOKEN_DECIMALS,
 ): bigint {
   parseSettlementTokenDecimals(decimals);
