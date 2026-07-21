@@ -135,6 +135,7 @@ interface ResolvedExchangeClientConfig {
 }
 
 const UINT32_MAX = 2n ** 32n - 1n;
+const MIN_AGENT_ACTION_APPROVAL_NONCE = 1_780_272_000n;
 const DECIMAL_STRING_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 export class InfoClient {
@@ -293,8 +294,9 @@ export class ExchangeClient {
   async placeAgentOrder<const TInput extends PlaceAgentOrderInput>(
     input: ExactInput<PlaceAgentOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
-    const approvalNonce =
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
+    const approvalNonce = parseAgentActionApprovalNonce(
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+    );
     const order = buildOrder({
       ...input,
       price: parsePriceInput(input.price),
@@ -343,8 +345,9 @@ export class ExchangeClient {
   async cancelAgentOrder<const TInput extends CancelAgentOrderInput>(
     input: ExactInput<CancelAgentOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    const approvalNonce =
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
+    const approvalNonce = parseAgentActionApprovalNonce(
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+    );
     return this.signAndPostCancel({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
@@ -380,8 +383,9 @@ export class ExchangeClient {
   async claimAgent<const TInput extends AgentClaimInput>(
     input: ExactInput<AgentClaimInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
-    const approvalNonce =
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender));
+    const approvalNonce = parseAgentActionApprovalNonce(
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+    );
     return this.signAndPostClaim({
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
@@ -422,7 +426,7 @@ export class ExchangeClient {
     const sender = this.wallet.address;
     const approvalNonce =
       input.approvalNonce ??
-      BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000));
+      BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000)) / 1000n;
     const approvalSignature = this.signAgentApproval({
       master: sender,
       agent: input.agent,
@@ -633,4 +637,45 @@ function parseAgentStatusResponse(data: unknown): AgentStatusResponse {
   }
 
   return { nonce: value };
+}
+
+function parseAgentActionApprovalNonce(input: unknown, path = "$.approvalNonce"): bigint {
+  let value: bigint;
+
+  if (typeof input === "bigint") {
+    value = input;
+  } else if (typeof input === "string") {
+    if (!DECIMAL_STRING_PATTERN.test(input)) {
+      throw createProtocolValidationError(
+        "invalid_decimal_string",
+        path,
+        "approvalNonce must be a canonical unsigned decimal string",
+      );
+    }
+    value = BigInt(input);
+  } else {
+    throw createProtocolValidationError(
+      "invalid_type",
+      path,
+      "approvalNonce must be a bigint or decimal string",
+    );
+  }
+
+  if (value < 0n || value > UINT32_MAX) {
+    throw createProtocolValidationError(
+      "integer_out_of_range",
+      path,
+      `approvalNonce must be in range 0..${UINT32_MAX.toString()}`,
+    );
+  }
+
+  if (value <= MIN_AGENT_ACTION_APPROVAL_NONCE) {
+    throw createProtocolValidationError(
+      "invalid_value",
+      path,
+      `approvalNonce must be greater than ${MIN_AGENT_ACTION_APPROVAL_NONCE.toString()}`,
+    );
+  }
+
+  return value;
 }

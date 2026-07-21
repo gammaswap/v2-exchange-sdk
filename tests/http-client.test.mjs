@@ -25,6 +25,8 @@ const EXCHANGE = "0x0000000000000000000000000000000000000007";
 const DEPOSIT_LEDGER = "0x0000000000000000000000000000000000000008";
 const PERMIT2 = "0x0000000000000000000000000000000000000009";
 const ORDER_HASH = `0x${"33".repeat(32)}`;
+const AGENT_APPROVAL_NONCE = "1780272001";
+const MIN_AGENT_APPROVAL_NONCE = "1780272000";
 
 function createFetchMock(handler) {
   const calls = [];
@@ -75,7 +77,7 @@ function baseAgentOrderInput(overrides = {}) {
   return {
     ...baseOrderInput(),
     sender: MASTER,
-    approvalNonce: "0",
+    approvalNonce: AGENT_APPROVAL_NONCE,
     ...overrides,
   };
 }
@@ -94,7 +96,7 @@ function baseAgentCancelInput(overrides = {}) {
   return {
     ...baseCancelInput(),
     sender: MASTER,
-    approvalNonce: "0",
+    approvalNonce: AGENT_APPROVAL_NONCE,
     ...overrides,
   };
 }
@@ -112,7 +114,7 @@ function baseAgentClaimInput(overrides = {}) {
   return {
     ...baseClaimInput(),
     sender: MASTER,
-    approvalNonce: "0",
+    approvalNonce: AGENT_APPROVAL_NONCE,
     ...overrides,
   };
 }
@@ -299,7 +301,7 @@ test("ExchangeClient uses hard-coded localhost contracts when no contracts are p
 test("ExchangeClient agent actions fetch approval nonce and sign as the agent", async () => {
   const mock = createFetchMock((call) => {
     if (call.init.method === "GET") {
-      return { data: { nonce: "42" } };
+      return { data: { nonce: AGENT_APPROVAL_NONCE } };
     }
     return { data: { accepted: true } };
   });
@@ -329,12 +331,12 @@ test("ExchangeClient agent actions fetch approval nonce and sign as the agent", 
   assert.equal(order.request.order.signer, AGENT);
   assert.equal(order.request.order.sender, MASTER);
   assert.equal(order.request.order.signatureType, SignatureType.AGENT.toString());
-  assert.equal(order.request.order.approvalNonce, "42");
+  assert.equal(order.request.order.approvalNonce, AGENT_APPROVAL_NONCE);
   assert.ok(validateSignatureJS(order.request.orderHash, order.request.signature, AGENT));
 
-  assert.equal(cancel.request.cancel.approvalNonce, "42");
+  assert.equal(cancel.request.cancel.approvalNonce, AGENT_APPROVAL_NONCE);
   assert.ok(validateSignatureJS(cancel.request.orderHash, cancel.request.signature, AGENT));
-  assert.equal(claim.request.claim.approvalNonce, "42");
+  assert.equal(claim.request.claim.approvalNonce, AGENT_APPROVAL_NONCE);
   assert.ok(validateSignatureJS(claim.request.orderHash, claim.request.signature, AGENT));
 });
 
@@ -385,6 +387,31 @@ test("ExchangeClient rejects invalid signed action fields before posting", async
       return true;
     },
   );
+  assert.equal(mock.calls.length, 0);
+});
+
+test("ExchangeClient rejects agent action approvalNonce values at or below the minimum before posting", async () => {
+  const mock = createFetchMock(() => ({ data: { accepted: true } }));
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: AGENT_WALLET,
+    chainId: "31337",
+    fetch: mock.fetch,
+  });
+
+  for (const action of [
+    () => client.placeAgentOrder(baseAgentOrderInput({ approvalNonce: MIN_AGENT_APPROVAL_NONCE })),
+    () => client.cancelAgentOrder(baseAgentCancelInput({ approvalNonce: "0" })),
+    () => client.claimAgent(baseAgentClaimInput({ approvalNonce: MIN_AGENT_APPROVAL_NONCE })),
+  ]) {
+    await assert.rejects(action, (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_value");
+      assert.equal(error.issues[0]?.path, "$.approvalNonce");
+      return true;
+    });
+  }
+
   assert.equal(mock.calls.length, 0);
 });
 
