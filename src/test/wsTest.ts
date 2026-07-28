@@ -16,6 +16,10 @@ ws.on("message", (message) => {
     console.log(message.toString());
 });
 
+ws.on("ping", () => {
+    console.log("ping received");
+})
+
 ws.on("error", (error) => {
     console.error(error);
 });
