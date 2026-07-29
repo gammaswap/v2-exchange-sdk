@@ -596,6 +596,93 @@ export interface ClaimEvent {
     arrivalTime: bigint;
 }
 
+export type WebSocketMarketEventType = "order" | "trade" | "cancel" | "resolution";
+
+export type WebSocketConnectionState =
+    | "idle"
+    | "connecting"
+    | "open"
+    | "reconnecting"
+    | "closed";
+
+export interface WebSocketConnectedMessage {
+    type: "connected";
+    message: string;
+}
+
+export interface WebSocketSubscribedMessage {
+    type: "subscribed";
+    assetId: string;
+}
+
+export interface WebSocketUnsubscribedMessage {
+    type: "unsubscribed";
+    assetId: string;
+}
+
+export interface WebSocketErrorMessage {
+    type: "error";
+    message: string;
+}
+
+export type WebSocketControlMessage =
+    | WebSocketConnectedMessage
+    | WebSocketSubscribedMessage
+    | WebSocketUnsubscribedMessage
+    | WebSocketErrorMessage;
+
+export interface WebSocketOrderUpdate {
+    type: "order";
+    seqId: bigint;
+    assetId: bigint;
+    epoch: bigint;
+    data: OrderEvent;
+}
+
+export interface WebSocketTradeUpdate {
+    type: "trade";
+    seqId: bigint;
+    assetId: bigint;
+    epoch: bigint;
+    data: TradeEvent;
+}
+
+export interface WebSocketCancelUpdate {
+    type: "cancel";
+    seqId: bigint;
+    assetId: bigint;
+    epoch: bigint;
+    data: CancelEvent;
+}
+
+export interface WebSocketResolutionUpdate {
+    type: "resolution";
+    seqId: bigint;
+    assetId: bigint;
+    epoch: bigint;
+    data: ResolutionEvent;
+}
+
+export type WebSocketMarketUpdate =
+    | WebSocketOrderUpdate
+    | WebSocketTradeUpdate
+    | WebSocketCancelUpdate
+    | WebSocketResolutionUpdate;
+
+export type WebSocketMessage = WebSocketControlMessage | WebSocketMarketUpdate;
+
+export interface OrderBookSubscriptionHandlers {
+    onUpdate?: (update: WebSocketMarketUpdate) => void;
+    onOrder?: (update: WebSocketOrderUpdate) => void;
+    onTrade?: (update: WebSocketTradeUpdate) => void;
+    onCancel?: (update: WebSocketCancelUpdate) => void;
+    onResolution?: (update: WebSocketResolutionUpdate) => void;
+    onError?: (error: unknown) => void;
+    onResyncRequired?: (assetId: string) => void;
+}
+
+export type Unsubscribe = () => Promise<void>;
+
 export interface Asset {
     strikePrice: bigint;
     ledger: string;

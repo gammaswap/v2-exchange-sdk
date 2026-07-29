@@ -22,4 +22,7 @@ test("package root and public subpath exports can be imported", async () => {
   for (const module of modules) {
     assert.equal(typeof module, "object");
   }
+
+  const websocketModule = modules.at(-1);
+  assert.equal(typeof websocketModule.createExchangeWebSocketClient, "function");
 });

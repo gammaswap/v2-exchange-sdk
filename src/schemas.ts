@@ -24,7 +24,9 @@ import type {
   GetOrderBookRequest,
   GetPositionRequest,
   GetTopOfBookRequest,
+  OrderEvent,
   ProtocolJson,
+  ResolutionEvent,
   SignedApproveAgentMessage,
   SignedCancelMessage,
   SignedClaimMessage,
@@ -35,6 +37,11 @@ import type {
   SignedResolutionMessage,
   SignedRevokeAgentMessage,
   SignedWithdrawalMessage,
+  TradeEvent,
+  WebSocketControlMessage,
+  WebSocketMarketUpdate,
+  WebSocketMessage,
+  CancelEvent,
 } from "./types.js";
 
 export interface ProtocolSchema<T extends object> {
@@ -215,6 +222,38 @@ function parseBytes32(input: unknown, path: string): string {
   }
 
   return input;
+}
+
+function parseString(input: unknown, path: string): string {
+  if (typeof input !== "string") {
+    throw createProtocolValidationError("invalid_type", path, "expected a string");
+  }
+
+  return input;
+}
+
+function getRequiredField(record: Record<string, unknown>, key: string, path: string): unknown {
+  if (!Object.hasOwn(record, key)) {
+    throw createProtocolValidationError("missing_field", `${path}.${key}`, "field is required");
+  }
+
+  return record[key];
+}
+
+function parseWebSocketSeqId(input: unknown, path: string): bigint {
+  if (typeof input === "number") {
+    if (!Number.isSafeInteger(input) || input < 0) {
+      throw createProtocolValidationError(
+        "invalid_type",
+        path,
+        "expected a safe unsigned integer sequence id",
+      );
+    }
+
+    return BigInt(input);
+  }
+
+  return parseUnsignedInteger(input, path, UINT64_MAX);
 }
 
 function parseExpectedInteger(
@@ -621,6 +660,217 @@ export const getAgentApprovalRequestSchema = objectSchema<GetAgentApprovalReques
 export const getExchangeConfigRequestSchema = objectSchema<GetExchangeConfigRequest>({
   chainId: uint256,
 });
+
+export function parseWebSocketMessage(input: unknown): WebSocketMessage {
+  const record = parseObject(input, "$");
+  const type = parseString(getRequiredField(record, "type", "$"), "$.type");
+
+  if (
+    type === "connected" ||
+    type === "subscribed" ||
+    type === "unsubscribed" ||
+    type === "error"
+  ) {
+    return parseWebSocketControlMessage(record, type);
+  }
+
+  if (type === "order" || type === "trade" || type === "cancel" || type === "resolution") {
+    return parseWebSocketMarketUpdateRecord(record, type);
+  }
+
+  throw createProtocolValidationError("invalid_value", "$.type", "unknown websocket message type");
+}
+
+export function parseWebSocketMarketUpdate(input: unknown): WebSocketMarketUpdate {
+  const message = parseWebSocketMessage(input);
+
+  if (
+    message.type !== "order" &&
+    message.type !== "trade" &&
+    message.type !== "cancel" &&
+    message.type !== "resolution"
+  ) {
+    throw createProtocolValidationError("invalid_value", "$.type", "expected market update type");
+  }
+
+  return message;
+}
+
+function parseWebSocketControlMessage(
+  record: Record<string, unknown>,
+  type: string,
+): WebSocketControlMessage {
+  if (type === "connected") {
+    return {
+      type,
+      message: parseString(getRequiredField(record, "message", "$"), "$.message"),
+    };
+  }
+
+  if (type === "subscribed" || type === "unsubscribed") {
+    return {
+      type,
+      assetId: parseUnsignedInteger(
+        getRequiredField(record, "assetId", "$"),
+        "$.assetId",
+        UINT256_MAX,
+      ).toString(),
+    };
+  }
+
+  return {
+    type: "error",
+    message: parseString(getRequiredField(record, "message", "$"), "$.message"),
+  };
+}
+
+function parseWebSocketMarketUpdateRecord(
+  record: Record<string, unknown>,
+  type: "order" | "trade" | "cancel" | "resolution",
+): WebSocketMarketUpdate {
+  const seqId = parseWebSocketSeqId(getRequiredField(record, "seqId", "$"), "$.seqId");
+  const dataInput = getRequiredField(record, "data", "$");
+
+  if (type === "order") {
+    const data = parseOrderEvent(dataInput, "$.data");
+    return { type, seqId, assetId: data.assetId, epoch: data.epoch, data };
+  }
+
+  if (type === "trade") {
+    const data = parseTradeEvent(dataInput, "$.data");
+    return { type, seqId, assetId: data.assetId, epoch: data.epoch, data };
+  }
+
+  if (type === "cancel") {
+    const data = parseCancelEvent(dataInput, "$.data");
+    return { type, seqId, assetId: data.assetId, epoch: data.epoch, data };
+  }
+
+  const data = parseResolutionEvent(dataInput, "$.data");
+  return { type, seqId, assetId: data.assetId, epoch: data.epoch, data };
+}
+
+function parseOrderEvent(input: unknown, path: string): OrderEvent {
+  const record = parseObject(input, path);
+
+  return {
+    orderId: parseBytes32(getRequiredField(record, "orderId", path), `${path}.orderId`),
+    assetId: parseUnsignedInteger(
+      getRequiredField(record, "assetId", path),
+      `${path}.assetId`,
+      UINT256_MAX,
+    ),
+    epoch: parseUnsignedInteger(
+      getRequiredField(record, "epoch", path),
+      `${path}.epoch`,
+      UINT32_MAX,
+    ),
+    price: parseUnsignedInteger(
+      getRequiredField(record, "price", path),
+      `${path}.price`,
+      UINT64_MAX,
+    ),
+    side: parseString(getRequiredField(record, "side", path), `${path}.side`),
+    size: parseUnsignedInteger(getRequiredField(record, "size", path), `${path}.size`, UINT64_MAX),
+    arrivalTime: parseUnsignedInteger(
+      getRequiredField(record, "arrivalTime", path),
+      `${path}.arrivalTime`,
+      UINT64_MAX,
+    ),
+    tif: parseString(getRequiredField(record, "tif", path), `${path}.tif`),
+    type: parseString(getRequiredField(record, "type", path), `${path}.type`),
+  };
+}
+
+function parseTradeEvent(input: unknown, path: string): TradeEvent {
+  const record = parseObject(input, path);
+
+  return {
+    orderId: parseBytes32(getRequiredField(record, "orderId", path), `${path}.orderId`),
+    assetId: parseUnsignedInteger(
+      getRequiredField(record, "assetId", path),
+      `${path}.assetId`,
+      UINT256_MAX,
+    ),
+    epoch: parseUnsignedInteger(
+      getRequiredField(record, "epoch", path),
+      `${path}.epoch`,
+      UINT32_MAX,
+    ),
+    price: parseUnsignedInteger(
+      getRequiredField(record, "price", path),
+      `${path}.price`,
+      UINT64_MAX,
+    ),
+    side: parseString(getRequiredField(record, "side", path), `${path}.side`),
+    size: parseUnsignedInteger(getRequiredField(record, "size", path), `${path}.size`, UINT64_MAX),
+    arrivalTime: parseUnsignedInteger(
+      getRequiredField(record, "arrivalTime", path),
+      `${path}.arrivalTime`,
+      UINT64_MAX,
+    ),
+    fillPrice: parseUnsignedInteger(
+      getRequiredField(record, "fillPrice", path),
+      `${path}.fillPrice`,
+      UINT64_MAX,
+    ),
+    fill: parseUnsignedInteger(getRequiredField(record, "fill", path), `${path}.fill`, UINT64_MAX),
+    tif: parseString(getRequiredField(record, "tif", path), `${path}.tif`),
+    type: parseString(getRequiredField(record, "type", path), `${path}.type`),
+  };
+}
+
+function parseCancelEvent(input: unknown, path: string): CancelEvent {
+  const record = parseObject(input, path);
+
+  return {
+    orderId: parseBytes32(getRequiredField(record, "orderId", path), `${path}.orderId`),
+    cancelId: parseBytes32(getRequiredField(record, "cancelId", path), `${path}.cancelId`),
+    assetId: parseUnsignedInteger(
+      getRequiredField(record, "assetId", path),
+      `${path}.assetId`,
+      UINT256_MAX,
+    ),
+    epoch: parseUnsignedInteger(
+      getRequiredField(record, "epoch", path),
+      `${path}.epoch`,
+      UINT32_MAX,
+    ),
+    arrivalTime: parseUnsignedInteger(
+      getRequiredField(record, "arrivalTime", path),
+      `${path}.arrivalTime`,
+      UINT64_MAX,
+    ),
+  };
+}
+
+function parseResolutionEvent(input: unknown, path: string): ResolutionEvent {
+  const record = parseObject(input, path);
+
+  return {
+    orderId: parseBytes32(getRequiredField(record, "orderId", path), `${path}.orderId`),
+    assetId: parseUnsignedInteger(
+      getRequiredField(record, "assetId", path),
+      `${path}.assetId`,
+      UINT256_MAX,
+    ),
+    epoch: parseUnsignedInteger(
+      getRequiredField(record, "epoch", path),
+      `${path}.epoch`,
+      UINT32_MAX,
+    ),
+    price: parseUnsignedInteger(
+      getRequiredField(record, "price", path),
+      `${path}.price`,
+      UINT64_MAX,
+    ),
+    arrivalTime: parseUnsignedInteger(
+      getRequiredField(record, "arrivalTime", path),
+      `${path}.arrivalTime`,
+      UINT64_MAX,
+    ),
+  };
+}
 
 export function parseEip712Order(input: unknown): Eip712Order {
   return eip712OrderSchema.parse(input);
