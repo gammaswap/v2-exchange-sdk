@@ -16,6 +16,7 @@ const EXCHANGE = "0x0000000000000000000000000000000000000007";
 const DEPOSIT_LEDGER = "0x0000000000000000000000000000000000000008";
 const PERMIT2 = "0x0000000000000000000000000000000000000009";
 const ORDER_HASH = `0x${"11".repeat(32)}`;
+const REPLACEMENT_ORDER_HASH = `0x${"55".repeat(32)}`;
 const SIGNATURE = `0x${"22".repeat(65)}`;
 const PERMIT_SIGNATURE = `0x${"33".repeat(65)}`;
 const APPROVAL_SIGNATURE = `0x${"44".repeat(65)}`;
@@ -46,6 +47,17 @@ const cancelJson = {
   epoch: "2",
   orderHash: ORDER_HASH,
   approvalNonce: "7",
+};
+
+const cancelReplaceJson = {
+  typ: OrderType.CANCEL_REPLACE.toString(),
+  ...auth,
+  assetId: "123456789012345678901234567890",
+  epoch: "2",
+  cancelOrderHash: ORDER_HASH,
+  replacementOrderHash: REPLACEMENT_ORDER_HASH,
+  approvalNonce: "7",
+  allOrNothing: false,
 };
 
 const claimJson = {
@@ -155,6 +167,15 @@ const actionCases = [
     typ: OrderType.CANCEL,
   },
   {
+    name: "cancel replace",
+    json: cancelReplaceJson,
+    parse: schemas.parseEip712CancelReplace,
+    toJson: schemas.toJsonEip712CancelReplace,
+    build: builders.buildCancelReplace,
+    buildJson: builders.buildCancelReplaceJson,
+    typ: OrderType.CANCEL_REPLACE,
+  },
+  {
     name: "claim",
     json: claimJson,
     parse: schemas.parseEip712Claim,
@@ -251,6 +272,18 @@ const signedMessageCases = [
     action: cancelJson,
     build: builders.buildSignedCancelMessage,
     buildJson: builders.buildSignedCancelMessageJson,
+  },
+  {
+    name: "cancel replace",
+    bodyKey: "cancelReplace",
+    action: cancelReplaceJson,
+    build: builders.buildSignedCancelReplaceMessage,
+    buildJson: builders.buildSignedCancelReplaceMessageJson,
+    extraInput: {
+      replacement: orderJson,
+      replacementOrderHash: REPLACEMENT_ORDER_HASH,
+      replacementSignature: SIGNATURE,
+    },
   },
   {
     name: "claim",
@@ -386,6 +419,7 @@ test("signed message builders validate wrappers and serialize decimal JSON", () 
       chainId: "31337",
       orderHash: ORDER_HASH,
       signature: SIGNATURE,
+      ...(messageCase.extraInput ?? {}),
     };
 
     const message = messageCase.build(input);
@@ -394,6 +428,19 @@ test("signed message builders validate wrappers and serialize decimal JSON", () 
     assert.equal(message.chainId, 31337n, messageCase.name);
     assert.equal(json.chainId, "31337", messageCase.name);
     assert.deepEqual(json[messageCase.bodyKey], messageCase.action, messageCase.name);
+    if (messageCase.extraInput?.replacement !== undefined) {
+      assert.deepEqual(json.replacement, messageCase.extraInput.replacement, messageCase.name);
+      assert.equal(
+        json.replacementOrderHash,
+        messageCase.extraInput.replacementOrderHash,
+        messageCase.name,
+      );
+      assert.equal(
+        json.replacementSignature,
+        messageCase.extraInput.replacementSignature,
+        messageCase.name,
+      );
+    }
   }
 });
 

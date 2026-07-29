@@ -59,17 +59,17 @@ export interface Eip712Cancel {
 }
 
 export interface Eip712CancelReplace {
-    typ: bigint;
-    nonce: bigint; // must be unique in every transaction the user sends
-    signer: string;
-    signatureType: bigint;
-    sender: string;
-    assetId: bigint;
-    epoch: bigint;
-    cancelOrderHash: string;
-    replacementOrderHash: string;
-    approvalNonce: bigint;
-    allOrNothing: boolean;
+  typ: bigint;
+  nonce: bigint;
+  signer: Address;
+  signatureType: bigint;
+  sender: Address;
+  assetId: bigint;
+  epoch: bigint;
+  cancelOrderHash: HexString;
+  replacementOrderHash: HexString;
+  approvalNonce: bigint;
+  allOrNothing: boolean;
 }
 
 export interface Eip712Claim {
@@ -187,13 +187,13 @@ export interface SignedCancelMessage {
 }
 
 export interface SignedCancelReplaceMessage {
-    cancelReplace: Eip712CancelReplace;
-    replacement: Eip712Order;
-    chainId: bigint;
-    orderHash: string;
-    signature: string;
-    replacementOrderHash: string;
-    replacementSignature: string;
+  cancelReplace: Eip712CancelReplace;
+  replacement: Eip712Order;
+  chainId: bigint;
+  orderHash: HexString;
+  signature: HexString;
+  replacementOrderHash: HexString;
+  replacementSignature: HexString;
 }
 
 export interface SignedClaimMessage {
@@ -367,6 +367,7 @@ export interface OnchainDepositEntry {
 export type JsonAuth = ProtocolJson<Auth>;
 export type JsonEip712Order = ProtocolJson<Eip712Order>;
 export type JsonEip712Cancel = ProtocolJson<Eip712Cancel>;
+export type JsonEip712CancelReplace = ProtocolJson<Eip712CancelReplace>;
 export type JsonEip712Claim = ProtocolJson<Eip712Claim>;
 export type JsonEip712Deposit = ProtocolJson<Eip712Deposit>;
 export type JsonEip712Withdrawal = ProtocolJson<Eip712Withdrawal>;
@@ -380,6 +381,7 @@ export type JsonEip712AgentApproval = ProtocolJson<Eip712AgentApproval>;
 
 export type JsonSignedOrderMessage = ProtocolJson<SignedOrderMessage>;
 export type JsonSignedCancelMessage = ProtocolJson<SignedCancelMessage>;
+export type JsonSignedCancelReplaceMessage = ProtocolJson<SignedCancelReplaceMessage>;
 export type JsonSignedClaimMessage = ProtocolJson<SignedClaimMessage>;
 export type JsonSignedDepositMessage = ProtocolJson<SignedDepositMessage>;
 export type JsonSignedWithdrawalMessage = ProtocolJson<SignedWithdrawalMessage>;
@@ -391,6 +393,7 @@ export type JsonSignedInvalidateMessage = ProtocolJson<SignedInvalidateMessage>;
 
 export type Eip712OrderInput = ProtocolInput<Eip712Order>;
 export type Eip712CancelInput = ProtocolInput<Eip712Cancel>;
+export type Eip712CancelReplaceInput = ProtocolInput<Eip712CancelReplace>;
 export type Eip712ClaimInput = ProtocolInput<Eip712Claim>;
 export type Eip712DepositInput = ProtocolInput<Eip712Deposit>;
 export type Eip712WithdrawalInput = ProtocolInput<Eip712Withdrawal>;
@@ -487,6 +490,19 @@ export type CancelOrderInput = {
   nonce?: ProtocolBigNumberish;
 };
 
+export type CancelReplaceOrderInput = {
+  assetId: ProtocolBigNumberish;
+  epoch: ProtocolBigNumberish;
+  cancelOrderHash: HexString;
+  side: boolean;
+  price: HumanDecimalString;
+  size: HumanDecimalString;
+  timeInForce?: ProtocolBigNumberish;
+  nonce?: ProtocolBigNumberish;
+  replacementNonce?: ProtocolBigNumberish;
+  allOrNothing?: boolean;
+};
+
 export type CancelAllInput = {
   assetId: ProtocolBigNumberish;
   epoch: ProtocolBigNumberish;
@@ -498,6 +514,11 @@ export type CancelAgentOrderInput = {
   epoch: ProtocolBigNumberish;
   orderHash: HexString;
   nonce?: ProtocolBigNumberish;
+  sender: Address;
+  approvalNonce?: ProtocolBigNumberish;
+};
+
+export type CancelReplaceAgentOrderInput = CancelReplaceOrderInput & {
   sender: Address;
   approvalNonce?: ProtocolBigNumberish;
 };

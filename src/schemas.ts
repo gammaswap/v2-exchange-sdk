@@ -5,6 +5,7 @@ import type {
   Eip712AgentApproval,
   Eip712ApproveAgent,
   Eip712Cancel,
+  Eip712CancelReplace,
   Eip712Claim,
   Eip712Deposit,
   Eip712Invalidate,
@@ -29,6 +30,7 @@ import type {
   ResolutionEvent,
   SignedApproveAgentMessage,
   SignedCancelMessage,
+  SignedCancelReplaceMessage,
   SignedClaimMessage,
   SignedDepositMessage,
   SignedInvalidateMessage,
@@ -65,6 +67,7 @@ type FieldSpecs<T extends object> = {
 export type Eip712Action =
   | Eip712Order
   | Eip712Cancel
+  | Eip712CancelReplace
   | Eip712Claim
   | Eip712Deposit
   | Eip712Withdrawal
@@ -78,6 +81,7 @@ export type Eip712Action =
 export type Eip712ActionJson =
   | ProtocolJson<Eip712Order>
   | ProtocolJson<Eip712Cancel>
+  | ProtocolJson<Eip712CancelReplace>
   | ProtocolJson<Eip712Claim>
   | ProtocolJson<Eip712Deposit>
   | ProtocolJson<Eip712Withdrawal>
@@ -375,6 +379,20 @@ export const eip712CancelSchema = objectSchema<Eip712Cancel>({
   approvalNonce: uint32,
 });
 
+export const eip712CancelReplaceSchema = objectSchema<Eip712CancelReplace>({
+  typ: exactUint(OrderType.CANCEL_REPLACE),
+  nonce: uint64,
+  signer: address,
+  signatureType,
+  sender: address,
+  assetId: uint256,
+  epoch: uint32,
+  cancelOrderHash: bytes32,
+  replacementOrderHash: bytes32,
+  approvalNonce: uint32,
+  allOrNothing: boolean,
+});
+
 export const eip712ClaimSchema = objectSchema<Eip712Claim>({
   typ: exactUint(OrderType.CLAIM),
   nonce: uint64,
@@ -565,6 +583,16 @@ export const signedCancelMessageSchema = objectSchema<SignedCancelMessage>({
   chainId: uint256,
   orderHash: bytes32,
   signature: hexData,
+});
+
+export const signedCancelReplaceMessageSchema = objectSchema<SignedCancelReplaceMessage>({
+  cancelReplace: nested(eip712CancelReplaceSchema),
+  replacement: nested(eip712OrderSchema),
+  chainId: uint256,
+  orderHash: bytes32,
+  signature: hexData,
+  replacementOrderHash: bytes32,
+  replacementSignature: hexData,
 });
 
 export const signedClaimMessageSchema = objectSchema<SignedClaimMessage>({
@@ -880,6 +908,10 @@ export function parseEip712Cancel(input: unknown): Eip712Cancel {
   return eip712CancelSchema.parse(input);
 }
 
+export function parseEip712CancelReplace(input: unknown): Eip712CancelReplace {
+  return eip712CancelReplaceSchema.parse(input);
+}
+
 export function parseEip712Claim(input: unknown): Eip712Claim {
   return eip712ClaimSchema.parse(input);
 }
@@ -936,6 +968,7 @@ export function parseEip712Action(input: unknown): Eip712Action {
   if (typ === OrderType.WITHDRAWAL) return parseEip712Withdrawal(input);
   if (typ === OrderType.FILL) return parseEip712Order(input);
   if (typ === OrderType.CANCEL) return parseEip712Cancel(input);
+  if (typ === OrderType.CANCEL_REPLACE) return parseEip712CancelReplace(input);
   if (typ === OrderType.RESOLUTION) return parseEip712Resolution(input);
   if (typ === OrderType.CLAIM) return parseEip712Claim(input);
   if (typ === OrderType.PAUSE) return parseEip712Pause(input);
@@ -953,6 +986,10 @@ export function parseSignedOrderMessage(input: unknown): SignedOrderMessage {
 
 export function parseSignedCancelMessage(input: unknown): SignedCancelMessage {
   return signedCancelMessageSchema.parse(input);
+}
+
+export function parseSignedCancelReplaceMessage(input: unknown): SignedCancelReplaceMessage {
+  return signedCancelReplaceMessageSchema.parse(input);
 }
 
 export function parseSignedClaimMessage(input: unknown): SignedClaimMessage {
@@ -993,6 +1030,12 @@ export function toJsonEip712Order(value: Eip712Order): ProtocolJson<Eip712Order>
 
 export function toJsonEip712Cancel(value: Eip712Cancel): ProtocolJson<Eip712Cancel> {
   return eip712CancelSchema.serialize(value);
+}
+
+export function toJsonEip712CancelReplace(
+  value: Eip712CancelReplace,
+): ProtocolJson<Eip712CancelReplace> {
+  return eip712CancelReplaceSchema.serialize(value);
 }
 
 export function toJsonEip712Claim(value: Eip712Claim): ProtocolJson<Eip712Claim> {
@@ -1058,6 +1101,9 @@ export function toJsonEip712Action(action: Eip712Action): Eip712ActionJson {
   }
   if (action.typ === OrderType.FILL) return toJsonEip712Order(action as Eip712Order);
   if (action.typ === OrderType.CANCEL) return toJsonEip712Cancel(action as Eip712Cancel);
+  if (action.typ === OrderType.CANCEL_REPLACE) {
+    return toJsonEip712CancelReplace(action as Eip712CancelReplace);
+  }
   if (action.typ === OrderType.RESOLUTION) {
     return toJsonEip712Resolution(action as Eip712Resolution);
   }
@@ -1089,6 +1135,12 @@ export function toJsonSignedCancelMessage(
   value: SignedCancelMessage,
 ): ProtocolJson<SignedCancelMessage> {
   return signedCancelMessageSchema.serialize(value);
+}
+
+export function toJsonSignedCancelReplaceMessage(
+  value: SignedCancelReplaceMessage,
+): ProtocolJson<SignedCancelReplaceMessage> {
+  return signedCancelReplaceMessageSchema.serialize(value);
 }
 
 export function toJsonSignedClaimMessage(

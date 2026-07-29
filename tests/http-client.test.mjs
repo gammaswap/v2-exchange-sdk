@@ -10,8 +10,12 @@ import {
   ProtocolValidationError,
 } from "@gammaswap/v2-exchange-sdk";
 import { SignatureType, OrderSide, TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
-import { getExchangeDomain, hashFillOrderJS } from "@gammaswap/v2-exchange-sdk/hashing";
-import { parseEip712Order } from "@gammaswap/v2-exchange-sdk/schemas";
+import {
+  getExchangeDomain,
+  hashCancelReplaceOrderJS,
+  hashFillOrderJS,
+} from "@gammaswap/v2-exchange-sdk/hashing";
+import { parseEip712CancelReplace, parseEip712Order } from "@gammaswap/v2-exchange-sdk/schemas";
 import { validateSignatureJS } from "@gammaswap/v2-exchange-sdk/signing";
 
 const WALLET = new Wallet(`0x${"11".repeat(32)}`);
@@ -100,9 +104,29 @@ function baseCancelInput(overrides = {}) {
   };
 }
 
+function baseCancelReplaceInput(overrides = {}) {
+  return {
+    ...baseOrderInput(),
+    nonce: "8",
+    replacementNonce: "7",
+    cancelOrderHash: ORDER_HASH,
+    allOrNothing: false,
+    ...overrides,
+  };
+}
+
 function baseAgentCancelInput(overrides = {}) {
   return {
     ...baseCancelInput(),
+    sender: MASTER,
+    approvalNonce: AGENT_APPROVAL_NONCE,
+    ...overrides,
+  };
+}
+
+function baseAgentCancelReplaceInput(overrides = {}) {
+  return {
+    ...baseCancelReplaceInput(),
     sender: MASTER,
     approvalNonce: AGENT_APPROVAL_NONCE,
     ...overrides,
@@ -285,6 +309,104 @@ test("ExchangeClient placeOrder uses its nonce manager when nonce is omitted", a
   );
 });
 
+test("ExchangeClient signs and posts regular and agent cancel-replace actions", async () => {
+  const mock = createFetchMock((call) => {
+    if (call.init.method === "GET") {
+      return { data: { nonce: AGENT_APPROVAL_NONCE } };
+    }
+    return { data: { accepted: true } };
+  });
+  const regularClient = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    contracts: exchangeConfig().contracts,
+    fetch: mock.fetch,
+  });
+  const agentClient = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: AGENT_WALLET,
+    chainId: "31337",
+    contracts: exchangeConfig().contracts,
+    fetch: mock.fetch,
+  });
+  const domain = getExchangeDomain("31337", EXCHANGE);
+
+  const regular = await regularClient.cancelReplaceOrder(
+    baseCancelReplaceInput({ allOrNothing: true }),
+  );
+  const agent = await agentClient.cancelReplaceAgentOrder(
+    baseAgentCancelReplaceInput({
+      nonce: "10",
+      replacementNonce: "9",
+      approvalNonce: undefined,
+    }),
+  );
+
+  assert.deepEqual(
+    mock.calls.map((call) => [call.init.method, new URL(call.url).pathname]),
+    [
+      ["POST", "/cancel-replace"],
+      ["GET", `/agents/status/${MASTER}`],
+      ["POST", "/cancel-replace"],
+    ],
+  );
+
+  assert.equal(regular.request.cancelReplace.signer, MASTER);
+  assert.equal(regular.request.cancelReplace.sender, MASTER);
+  assert.equal(regular.request.cancelReplace.signatureType, SignatureType.EOA.toString());
+  assert.equal(regular.request.cancelReplace.cancelOrderHash, ORDER_HASH);
+  assert.equal(regular.request.cancelReplace.allOrNothing, true);
+  assert.equal(regular.request.replacement.nonce, "7");
+  assert.equal(regular.request.cancelReplace.nonce, "8");
+  assert.equal(regular.request.replacement.size, "1000000");
+  assert.equal(regular.request.replacement.price, "500000");
+  assert.equal(
+    regular.request.replacementOrderHash,
+    hashFillOrderJS(parseEip712Order(regular.request.replacement), domain),
+  );
+  assert.equal(
+    regular.request.cancelReplace.replacementOrderHash,
+    regular.request.replacementOrderHash,
+  );
+  assert.equal(
+    regular.request.orderHash,
+    hashCancelReplaceOrderJS(parseEip712CancelReplace(regular.request.cancelReplace), domain),
+  );
+  assert.ok(
+    validateSignatureJS(
+      regular.request.replacementOrderHash,
+      regular.request.replacementSignature,
+      MASTER,
+    ),
+  );
+  assert.ok(validateSignatureJS(regular.request.orderHash, regular.request.signature, MASTER));
+
+  assert.equal(agent.request.cancelReplace.signer, AGENT);
+  assert.equal(agent.request.cancelReplace.sender, MASTER);
+  assert.equal(agent.request.cancelReplace.signatureType, SignatureType.AGENT.toString());
+  assert.equal(agent.request.cancelReplace.approvalNonce, AGENT_APPROVAL_NONCE);
+  assert.equal(agent.request.replacement.approvalNonce, AGENT_APPROVAL_NONCE);
+  assert.equal(agent.request.replacement.nonce, "9");
+  assert.equal(agent.request.cancelReplace.nonce, "10");
+  assert.equal(
+    agent.request.replacementOrderHash,
+    hashFillOrderJS(parseEip712Order(agent.request.replacement), domain),
+  );
+  assert.equal(
+    agent.request.orderHash,
+    hashCancelReplaceOrderJS(parseEip712CancelReplace(agent.request.cancelReplace), domain),
+  );
+  assert.ok(
+    validateSignatureJS(
+      agent.request.replacementOrderHash,
+      agent.request.replacementSignature,
+      AGENT,
+    ),
+  );
+  assert.ok(validateSignatureJS(agent.request.orderHash, agent.request.signature, AGENT));
+});
+
 test("ExchangeClient uses hard-coded localhost contracts when no contracts are provided", async () => {
   const defaultConfig = getDefaultExchangeChainConfig("31337");
   assert.ok(defaultConfig);
@@ -395,6 +517,15 @@ test("ExchangeClient rejects invalid signed action fields before posting", async
       return true;
     },
   );
+  await assert.rejects(
+    () => client.cancelReplaceOrder(baseCancelReplaceInput({ cancelOrderHash: ZeroHash })),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.code, "invalid_value");
+      assert.equal(error.issues[0]?.path, "$.cancelOrderHash");
+      return true;
+    },
+  );
   assert.equal(mock.calls.length, 0);
 });
 
@@ -410,6 +541,10 @@ test("ExchangeClient rejects agent action approvalNonce values at or below the m
   for (const action of [
     () => client.placeAgentOrder(baseAgentOrderInput({ approvalNonce: MIN_AGENT_APPROVAL_NONCE })),
     () => client.cancelAgentOrder(baseAgentCancelInput({ approvalNonce: "0" })),
+    () =>
+      client.cancelReplaceAgentOrder(
+        baseAgentCancelReplaceInput({ approvalNonce: MIN_AGENT_APPROVAL_NONCE }),
+      ),
     () => client.claimAgent(baseAgentClaimInput({ approvalNonce: MIN_AGENT_APPROVAL_NONCE })),
   ]) {
     await assert.rejects(action, (error) => {

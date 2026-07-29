@@ -3,6 +3,7 @@ import {
   parseEip712AgentApproval,
   parseEip712ApproveAgent,
   parseEip712Cancel,
+  parseEip712CancelReplace,
   parseEip712Claim,
   parseEip712Deposit,
   parseEip712Invalidate,
@@ -14,6 +15,7 @@ import {
   parseEip712Withdrawal,
   parseSignedApproveAgentMessage,
   parseSignedCancelMessage,
+  parseSignedCancelReplaceMessage,
   parseSignedClaimMessage,
   parseSignedDepositMessage,
   parseSignedInvalidateMessage,
@@ -25,6 +27,7 @@ import {
   toJsonEip712AgentApproval,
   toJsonEip712ApproveAgent,
   toJsonEip712Cancel,
+  toJsonEip712CancelReplace,
   toJsonEip712Claim,
   toJsonEip712Deposit,
   toJsonEip712Invalidate,
@@ -36,6 +39,7 @@ import {
   toJsonEip712Withdrawal,
   toJsonSignedApproveAgentMessage,
   toJsonSignedCancelMessage,
+  toJsonSignedCancelReplaceMessage,
   toJsonSignedClaimMessage,
   toJsonSignedDepositMessage,
   toJsonSignedInvalidateMessage,
@@ -51,6 +55,8 @@ import type {
   Eip712ApproveAgent,
   Eip712ApproveAgentInput,
   Eip712Cancel,
+  Eip712CancelReplace,
+  Eip712CancelReplaceInput,
   Eip712CancelInput,
   Eip712Claim,
   Eip712ClaimInput,
@@ -73,6 +79,7 @@ import type {
   JsonEip712AgentApproval,
   JsonEip712ApproveAgent,
   JsonEip712Cancel,
+  JsonEip712CancelReplace,
   JsonEip712Claim,
   JsonEip712Deposit,
   JsonEip712Invalidate,
@@ -84,6 +91,7 @@ import type {
   JsonEip712Withdrawal,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
+  JsonSignedCancelReplaceMessage,
   JsonSignedClaimMessage,
   JsonSignedDepositMessage,
   JsonSignedInvalidateMessage,
@@ -95,6 +103,7 @@ import type {
   ProtocolInput,
   SignedApproveAgentMessage,
   SignedCancelMessage,
+  SignedCancelReplaceMessage,
   SignedClaimMessage,
   SignedDepositMessage,
   SignedInvalidateMessage,
@@ -107,6 +116,7 @@ import type {
 
 export type BuildOrderInput = Omit<Eip712OrderInput, "typ">;
 export type BuildCancelInput = Omit<Eip712CancelInput, "typ">;
+export type BuildCancelReplaceInput = Omit<Eip712CancelReplaceInput, "typ">;
 export type BuildClaimInput = Omit<Eip712ClaimInput, "typ">;
 export type BuildDepositInput = Omit<Eip712DepositInput, "typ">;
 export type BuildWithdrawalInput = Omit<Eip712WithdrawalInput, "typ">;
@@ -126,6 +136,10 @@ export const buildFillOrder = buildOrder;
 
 export function buildCancel(input: BuildCancelInput): Eip712Cancel {
   return parseEip712Cancel({ ...input, typ: OrderType.CANCEL });
+}
+
+export function buildCancelReplace(input: BuildCancelReplaceInput): Eip712CancelReplace {
+  return parseEip712CancelReplace({ ...input, typ: OrderType.CANCEL_REPLACE });
 }
 
 export function buildClaim(input: BuildClaimInput): Eip712Claim {
@@ -180,6 +194,12 @@ export interface BuildSignedCancelMessageInput extends Omit<
   "cancel"
 > {
   cancel: Eip712CancelInput;
+}
+
+export interface BuildSignedCancelReplaceMessageInput
+  extends Omit<ProtocolInput<SignedCancelReplaceMessage>, "cancelReplace" | "replacement"> {
+  cancelReplace: Eip712CancelReplaceInput;
+  replacement: Eip712OrderInput;
 }
 
 export interface BuildSignedClaimMessageInput extends Omit<
@@ -248,6 +268,12 @@ export function buildSignedCancelMessage(
   return parseSignedCancelMessage(input);
 }
 
+export function buildSignedCancelReplaceMessage(
+  input: BuildSignedCancelReplaceMessageInput,
+): SignedCancelReplaceMessage {
+  return parseSignedCancelReplaceMessage(input);
+}
+
 export function buildSignedClaimMessage(input: BuildSignedClaimMessageInput): SignedClaimMessage {
   return parseSignedClaimMessage(input);
 }
@@ -300,6 +326,10 @@ export function buildCancelJson(input: BuildCancelInput): JsonEip712Cancel {
   return toJsonEip712Cancel(buildCancel(input));
 }
 
+export function buildCancelReplaceJson(input: BuildCancelReplaceInput): JsonEip712CancelReplace {
+  return toJsonEip712CancelReplace(buildCancelReplace(input));
+}
+
 export function buildClaimJson(input: BuildClaimInput): JsonEip712Claim {
   return toJsonEip712Claim(buildClaim(input));
 }
@@ -350,6 +380,12 @@ export function buildSignedCancelMessageJson(
   input: BuildSignedCancelMessageInput,
 ): JsonSignedCancelMessage {
   return toJsonSignedCancelMessage(buildSignedCancelMessage(input));
+}
+
+export function buildSignedCancelReplaceMessageJson(
+  input: BuildSignedCancelReplaceMessageInput,
+): JsonSignedCancelReplaceMessage {
+  return toJsonSignedCancelReplaceMessage(buildSignedCancelReplaceMessage(input));
 }
 
 export function buildSignedClaimMessageJson(

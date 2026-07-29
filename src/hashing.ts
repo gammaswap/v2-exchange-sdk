@@ -690,8 +690,11 @@ function getInvalidateStructHash(order: Eip712Invalidate): string {
   );
 }
 
-export function hashCancelReplaceOrderJS(order: Eip712CancelReplace) : string {
-    return hashTypedDataStruct(getCancelReplaceStructHash(order));
+export function hashCancelReplaceOrderJS(
+  order: Eip712CancelReplace,
+  domain: TypedDataDomain = EXCHANGE_DOMAIN,
+): string {
+  return hashTypedDataStruct(getCancelReplaceStructHash(order), domain);
 }
 
 export function hashInvalidateOrderJS(

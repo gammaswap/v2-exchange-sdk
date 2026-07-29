@@ -3,6 +3,7 @@ import {
   buildApproveAgent,
   buildAgentApproval,
   buildCancel,
+  buildCancelReplace,
   buildClaim,
   buildOrder,
   buildRevokeAgent,
@@ -10,6 +11,8 @@ import {
   buildSignedApproveAgentMessageJson,
   buildSignedCancelMessage,
   buildSignedCancelMessageJson,
+  buildSignedCancelReplaceMessage,
+  buildSignedCancelReplaceMessageJson,
   buildSignedClaimMessage,
   buildSignedClaimMessageJson,
   buildSignedOrderMessage,
@@ -20,6 +23,7 @@ import {
   buildSignedWithdrawalMessageJson,
   buildWithdrawal,
   type BuildCancelInput,
+  type BuildCancelReplaceInput,
   type BuildClaimInput,
 } from "./builders.js";
 import { SignatureType, TimeInForce } from "./constants.js";
@@ -30,6 +34,7 @@ import {
   getExchangeDomain,
   hashAgentApprovalJS,
   hashApproveAgentOrderJS,
+  hashCancelReplaceOrderJS,
   hashCancelOrderJS,
   hashClaimOrderJS,
   hashFillOrderJS,
@@ -66,6 +71,7 @@ import type {
   JsonExchangeChainConfig,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
+  JsonSignedCancelReplaceMessage,
   JsonSignedClaimMessage,
   JsonSignedOrderMessage,
   JsonSignedRevokeAgentMessage,
@@ -76,7 +82,9 @@ import type {
   PlaceAgentOrderInput,
   CancelOrderInput,
   CancelAllInput,
+  CancelReplaceOrderInput,
   CancelAgentOrderInput,
+  CancelReplaceAgentOrderInput,
   CancelAllAgentInput,
   ClaimInput,
   AgentClaimInput,
@@ -132,6 +140,14 @@ interface AgentStatusResponse {
 interface ResolvedExchangeClientConfig {
   chainId: bigint;
   contracts: ExchangeContracts;
+}
+
+interface CancelReplaceSigningInput extends Omit<BuildCancelReplaceInput, "replacementOrderHash"> {
+  replacementNonce: ProtocolBigNumberish;
+  side: boolean;
+  price: ProtocolBigNumberish;
+  size: ProtocolBigNumberish;
+  timeInForce: ProtocolBigNumberish;
 }
 
 const UINT32_MAX = 2n ** 32n - 1n;
@@ -344,6 +360,26 @@ export class ExchangeClient {
     });
   }
 
+  async cancelReplaceOrder<const TInput extends CancelReplaceOrderInput>(
+    input: ExactInput<CancelReplaceOrderInput, TInput>,
+  ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
+    assertNonZeroCancelReplaceHash(input.cancelOrderHash);
+
+    return this.signAndPostCancelReplace({
+      ...input,
+      price: parsePriceInput(input.price),
+      size: parseSizeInput(input.size),
+      timeInForce: input.timeInForce ?? TimeInForce.GTC,
+      replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
+      nonce: input.nonce ?? this.nonceManager.next(),
+      signer: this.wallet.address,
+      signatureType: SignatureType.EOA,
+      sender: this.wallet.address,
+      approvalNonce: 0n,
+      allOrNothing: input.allOrNothing ?? false,
+    });
+  }
+
   async cancelAgentOrder<const TInput extends CancelAgentOrderInput>(
     input: ExactInput<CancelAgentOrderInput, TInput>,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
@@ -366,6 +402,28 @@ export class ExchangeClient {
       ...input,
       nonce: input.nonce ?? this.nonceManager.next(),
       orderHash: ZeroHash,
+    });
+  }
+
+  async cancelReplaceAgentOrder<const TInput extends CancelReplaceAgentOrderInput>(
+    input: ExactInput<CancelReplaceAgentOrderInput, TInput>,
+  ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
+    assertNonZeroCancelReplaceHash(input.cancelOrderHash);
+
+    const approvalNonce = parseAgentActionApprovalNonce(
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+    );
+    return this.signAndPostCancelReplace({
+      ...input,
+      price: parsePriceInput(input.price),
+      size: parseSizeInput(input.size),
+      timeInForce: input.timeInForce ?? TimeInForce.GTC,
+      replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
+      nonce: input.nonce ?? this.nonceManager.next(),
+      signer: this.wallet.address,
+      signatureType: SignatureType.AGENT,
+      approvalNonce,
+      allOrNothing: input.allOrNothing ?? false,
     });
   }
 
@@ -507,6 +565,51 @@ export class ExchangeClient {
     return { ...response, request };
   }
 
+  private async signAndPostCancelReplace(
+    input: CancelReplaceSigningInput,
+  ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
+    const replacement = buildOrder({
+      nonce: input.replacementNonce,
+      signer: input.signer,
+      signatureType: input.signatureType,
+      sender: input.sender,
+      epoch: input.epoch,
+      side: input.side,
+      assetId: input.assetId,
+      size: input.size,
+      price: input.price,
+      timeInForce: input.timeInForce,
+      approvalNonce: input.approvalNonce,
+    });
+    const replacementOrderHash = hashFillOrderJS(replacement, this.exchangeDomain);
+    const replacementSignature = signOrderJS(replacementOrderHash, this.wallet);
+    const cancelReplace = buildCancelReplace({
+      nonce: input.nonce,
+      signer: input.signer,
+      signatureType: input.signatureType,
+      sender: input.sender,
+      assetId: input.assetId,
+      epoch: input.epoch,
+      cancelOrderHash: input.cancelOrderHash,
+      replacementOrderHash,
+      approvalNonce: input.approvalNonce,
+      allOrNothing: input.allOrNothing,
+    });
+    const orderHash = hashCancelReplaceOrderJS(cancelReplace, this.exchangeDomain);
+    const message = buildSignedCancelReplaceMessage({
+      cancelReplace,
+      replacement,
+      chainId: this.chainId,
+      orderHash,
+      signature: signOrderJS(orderHash, this.wallet),
+      replacementOrderHash,
+      replacementSignature,
+    });
+    const request = buildSignedCancelReplaceMessageJson(message);
+    const response = await this.post("/cancel-replace", request);
+    return { ...response, request };
+  }
+
   private async signAndPostClaim(
     input: BuildClaimInput,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
@@ -583,6 +686,16 @@ function resolveExchangeClientConfig(options: ExchangeClientOptions): ResolvedEx
 
 function parseChainId(input: ProtocolBigNumberish): bigint {
   return getExchangeConfigRequestSchema.parse({ chainId: input }).chainId;
+}
+
+function assertNonZeroCancelReplaceHash(orderHash: unknown): void {
+  if (typeof orderHash === "string" && orderHash.toLowerCase() === ZeroHash.toLowerCase()) {
+    throw createProtocolValidationError(
+      "invalid_value",
+      "$.cancelOrderHash",
+      "cancelReplace does not support cancel-all zero hash",
+    );
+  }
 }
 
 const defaultFetch: FetchLike = async (url, init) => {
