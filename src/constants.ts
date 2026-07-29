@@ -20,6 +20,7 @@ export const OrderType = {
   INVALIDATE: 60n,
   AGENT_APPROVE: 61n,
   AGENT_REVOKE: 62n,
+  CANCEL_REPLACE: 63n,
 };
 
 export const ChainId = {
@@ -70,6 +71,10 @@ export const CANCEL_ORDER_TYPEHASH = keccak256(
     "CancelOrder(uint8 typ,uint64 nonce,address signer,uint8 signatureType,address sender,uint256 assetId,uint32 epoch,bytes32 orderHash,uint32 approvalNonce)",
   ),
 );
+
+export const CANCEL_REPLACE_ORDER_TYPEHASH = keccak256(Buffer.from(
+    "CancelReplaceOrder(uint8 typ,uint64 nonce,address signer,uint8 signatureType,address sender,uint256 assetId,uint32 epoch,bytes32 cancelOrderHash,bytes32 replacementOrderHash,uint32 approvalNonce,bool allOrNothing)"
+));
 
 export const RESOLUTION_ORDER_TYPEHASH = keccak256(
   Buffer.from(

@@ -58,6 +58,20 @@ export interface Eip712Cancel {
   approvalNonce: bigint;
 }
 
+export interface Eip712CancelReplace {
+    typ: bigint;
+    nonce: bigint; // must be unique in every transaction the user sends
+    signer: string;
+    signatureType: bigint;
+    sender: string;
+    assetId: bigint;
+    epoch: bigint;
+    cancelOrderHash: string;
+    replacementOrderHash: string;
+    approvalNonce: bigint;
+    allOrNothing: boolean;
+}
+
 export interface Eip712Claim {
   typ: bigint;
   nonce: bigint;
@@ -170,6 +184,16 @@ export interface SignedCancelMessage {
   chainId: bigint;
   orderHash: HexString;
   signature: HexString;
+}
+
+export interface SignedCancelReplaceMessage {
+    cancelReplace: Eip712CancelReplace;
+    replacement: Eip712Order;
+    chainId: bigint;
+    orderHash: string;
+    signature: string;
+    replacementOrderHash: string;
+    replacementSignature: string;
 }
 
 export interface SignedClaimMessage {
