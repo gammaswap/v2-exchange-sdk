@@ -666,7 +666,7 @@ function parseNonNegativeIntegerOption(input: number, path: string): number {
   return input;
 }
 
-function parsePositiveIntegerOption(input: number, path: string): number {
+export function parsePositiveIntegerOption(input: number, path: string): number {
   if (!Number.isInteger(input) || input <= 0) {
     throw createProtocolValidationError("invalid_value", path, "expected a positive integer");
   }

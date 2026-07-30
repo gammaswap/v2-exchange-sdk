@@ -2,6 +2,7 @@ import { ExchangeSdkError, createProtocolValidationError } from "./errors.js";
 import { parseOracleWebSocketMessage } from "./schemas.js";
 import {
   BaseSubscriptionWebSocketClient,
+  parsePositiveIntegerOption,
   type SubscriptionWebSocketClientOptions,
   type WebSocketConstructorLike,
   type WebSocketLike,
@@ -251,12 +252,4 @@ function normalizeSymbolId(input: ProtocolBigNumberish): string {
   }
 
   return value.toString();
-}
-
-function parsePositiveIntegerOption(input: number, path: string): number {
-  if (!Number.isInteger(input) || input <= 0) {
-    throw createProtocolValidationError("invalid_value", path, "expected a positive integer");
-  }
-
-  return input;
 }
