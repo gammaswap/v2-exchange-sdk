@@ -55,14 +55,14 @@ const info = createInfoClient({
 });
 ```
 
-Constructor parameters:
+### Constructor parameters:
 
 - `apiUrl`: required base URL for the exchange API.
 - `fetch`: optional replacement for `globalThis.fetch`, useful in tests or
   custom runtimes.
 - `headers`: optional headers added to every request.
 
-Available functions:
+### Available functions:
 
 - `getAsset(inputOrAssetId)`
 - `getBalance(inputOrAccount)`
@@ -74,7 +74,7 @@ Available functions:
 - `getAgentApprovalNonce(inputOrAccount)`
 - `getExchangeConfig(inputOrChainId)`
 
-Idiosyncrasies:
+### Notes:
 
 - This client does not sign messages and does not need a wallet.
 - `apiUrl` is normalized with a trailing slash internally.
@@ -96,7 +96,7 @@ const exchange = createExchangeClient({
 });
 ```
 
-Constructor parameters:
+### Constructor parameters:
 
 - `apiUrl`: required base URL for the exchange API.
 - `wallet`: required `ethers` `Wallet` used for signing.
@@ -111,7 +111,7 @@ Constructor parameters:
 - `nonceManager`: optional `NonceManager`. If omitted, a local nonce manager is
   used to fill missing action nonces.
 
-Available functions:
+### Available functions:
 
 - `placeOrder(input)`
 - `placeAgentOrder(input)`
@@ -128,7 +128,7 @@ Available functions:
 - `revokeAgent(input)`
 - `signAgentApproval(input)`
 
-Idiosyncrasies:
+### Notes:
 
 - Signed actions are strongly typed and reject unknown input fields at compile
   time when object literals are passed directly.
@@ -158,7 +158,7 @@ const deposit = createDepositClient({
 });
 ```
 
-Constructor parameters:
+### Constructor parameters:
 
 - `rpcUrl`: required JSON-RPC URL used to send transactions.
 - `wallet`: required `ethers` `Wallet`; the client connects it to the RPC
@@ -169,7 +169,7 @@ Constructor parameters:
   `depositLedger` if `depositLedger` is not provided.
 - `settlementTokenDecimals`: optional, currently required to be `6`.
 
-Available functions:
+### Available functions:
 
 - `getSettlementToken()`
 - `getPermit2()`
@@ -190,7 +190,7 @@ Available functions:
 - `depositWithPermit(input)`
 - `parseAmount(amount)`
 
-Idiosyncrasies:
+### Notes:
 
 - This client talks directly to the chain, not the HTTP exchange API.
 - The client checks the RPC chain ID before contract reads and transactions.
@@ -226,7 +226,7 @@ await unsubscribe();
 ws.close();
 ```
 
-Constructor parameters:
+### Constructor parameters:
 
 - `websocketUrl`: required websocket endpoint URL.
 - `WebSocketCtor`: optional websocket constructor. Defaults to
@@ -238,7 +238,7 @@ Constructor parameters:
   defaults to `15000`.
 - `onError`: optional global error callback.
 
-Available functions and properties:
+### Available functions and properties:
 
 - `connectionState`
 - `connect()`
@@ -256,7 +256,7 @@ Subscription handlers:
 - `onError(error)`
 - `onResyncRequired(assetId)`
 
-Idiosyncrasies:
+### Notes:
 
 - One client can subscribe to multiple asset IDs.
 - Subscribing multiple handlers to the same asset ID sends one server
@@ -276,6 +276,9 @@ Idiosyncrasies:
   uses it when a socket is already considered unhealthy; otherwise it falls back
   to `close()`. Events from abandoned sockets are ignored so stale close/error
   events cannot affect a newer connection.
+- If an abandoned socket is still connected but reached its state after calling
+  `close()` then the socket will not respond to pings from the server and 
+  therefore will count on the server terminating the connection.
 
 ## Sample Scripts
 
