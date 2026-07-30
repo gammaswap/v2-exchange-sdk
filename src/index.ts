@@ -7,6 +7,7 @@ export * from "./config.js";
 export * from "./client.js";
 export * from "./decimal-inputs.js";
 export * from "./integer-inputs.js";
+export * from "./string-inputs.js";
 export * from "./deposit-client.js";
 export * from "./websocket.js";
 export * from "./oracle-websocket.js";

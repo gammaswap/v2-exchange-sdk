@@ -56,6 +56,7 @@ import {
 } from "./schemas.js";
 import { signOrderJS } from "./signing.js";
 import { UINT32_MAX, parseUnsignedInteger } from "./integer-inputs.js";
+import { sameAddress } from "./string-inputs.js";
 import type {
   Address,
   Eip712AgentApproval,
@@ -487,7 +488,7 @@ export class ExchangeClient {
       input.approvalNonce ??
         BigInt(Date.now() + 120 * 1000 + Math.floor(Math.random() * 100 * 1000)) / 1000n,
     );
-    if (isSameAddress(input.agent, sender)) {
+    if (sameAddress(input.agent, sender)) {
       throw createProtocolValidationError(
         "invalid_value",
         "$.agent",
@@ -778,8 +779,4 @@ function parseApprovalNonceInteger(input: unknown, path: string): bigint {
     invalidDecimalString: "approvalNonce must be a canonical unsigned decimal string",
     outOfRange: (max) => `approvalNonce must be in range 0..${max.toString()}`,
   });
-}
-
-function isSameAddress(left: unknown, right: string): boolean {
-  return typeof left === "string" && left.toLowerCase() === right.toLowerCase();
 }

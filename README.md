@@ -31,6 +31,7 @@ Submodules are also exported:
 import { createExchangeWebSocketClient } from "@gammaswap/v2-exchange-sdk/websocket";
 import { createOracleWebSocketClient } from "@gammaswap/v2-exchange-sdk/oracle-websocket";
 import { parseUnsignedInteger } from "@gammaswap/v2-exchange-sdk/integer-inputs";
+import { parseAddress } from "@gammaswap/v2-exchange-sdk/string-inputs";
 import { TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
 ```
 
@@ -52,6 +53,10 @@ Integer-only helpers are exported from `@gammaswap/v2-exchange-sdk/integer-input
 for canonical unsigned decimal strings and bigint values. They intentionally
 reject JavaScript numbers unless a helper is explicitly for safe JSON/runtime
 integers.
+
+String-shaped helpers are exported from `@gammaswap/v2-exchange-sdk/string-inputs`
+for EVM addresses, non-zero addresses, hex data, bytes32 values, and
+case-insensitive address comparison.
 
 ## InfoClient
 

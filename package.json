@@ -48,6 +48,10 @@
       "types": "./dist/integer-inputs.d.ts",
       "import": "./dist/integer-inputs.js"
     },
+    "./string-inputs": {
+      "types": "./dist/string-inputs.d.ts",
+      "import": "./dist/string-inputs.js"
+    },
     "./oracle-websocket": {
       "types": "./dist/oracle-websocket.d.ts",
       "import": "./dist/oracle-websocket.js"

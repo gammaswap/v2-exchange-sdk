@@ -1,4 +1,3 @@
-import { isAddress } from "ethers";
 import { OrderType, SignatureType, TimeInForce } from "./constants.js";
 import { createProtocolValidationError } from "./errors.js";
 import {
@@ -11,6 +10,7 @@ import {
   parseSafeJsonUnsignedInteger,
   parseUnsignedInteger,
 } from "./integer-inputs.js";
+import { parseAddress, parseBytes32, parseHexData } from "./string-inputs.js";
 import type {
   Eip712AgentApproval,
   Eip712ApproveAgent,
@@ -105,9 +105,6 @@ export type Eip712ActionJson =
   | ProtocolJson<Eip712Invalidate>
   | ProtocolJson<Eip712OnchainDeposit>;
 
-const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
-const BYTES32_PATTERN = /^0x[0-9a-fA-F]{64}$/;
-
 const signatureTypeValues = new Set<bigint>(Object.values(SignatureType));
 
 function objectSchema<T extends object>(fields: FieldSpecs<T>): InternalProtocolSchema<T> {
@@ -164,37 +161,9 @@ function parseObject(input: unknown, path: string): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
-function parseAddress(input: unknown, path: string): string {
-  if (typeof input !== "string" || !isAddress(input)) {
-    throw createProtocolValidationError("invalid_value", path, "expected an EVM address");
-  }
-
-  return input;
-}
-
 function parseBoolean(input: unknown, path: string): boolean {
   if (typeof input !== "boolean") {
     throw createProtocolValidationError("invalid_type", path, "expected a boolean");
-  }
-
-  return input;
-}
-
-function parseHexData(input: unknown, path: string): string {
-  if (typeof input !== "string" || !HEX_DATA_PATTERN.test(input)) {
-    throw createProtocolValidationError(
-      "invalid_value",
-      path,
-      "expected 0x-prefixed hex data with an even byte length",
-    );
-  }
-
-  return input;
-}
-
-function parseBytes32(input: unknown, path: string): string {
-  if (typeof input !== "string" || !BYTES32_PATTERN.test(input)) {
-    throw createProtocolValidationError("invalid_value", path, "expected a 32-byte hex string");
   }
 
   return input;

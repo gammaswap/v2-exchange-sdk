@@ -2,8 +2,6 @@ import {
   Contract,
   Interface,
   JsonRpcProvider,
-  ZeroAddress,
-  isAddress,
   type ContractTransactionReceipt,
   type ContractTransactionResponse,
   type TypedDataDomain,
@@ -15,6 +13,7 @@ import { parseAmountInput, parsePositiveAmountInput } from "./decimal-inputs.js"
 import { createProtocolValidationError, ExchangeSdkError } from "./errors.js";
 import { getExchangeConfigRequestSchema, parseExchangeContracts } from "./schemas.js";
 import { UINT256_MAX, parseUnsignedInteger } from "./integer-inputs.js";
+import { parseAddress, parseHexData, parseNonZeroAddress, sameAddress } from "./string-inputs.js";
 import type {
   Address,
   ExchangeContractsInput,
@@ -58,7 +57,6 @@ export interface DepositTransactionResult extends OnchainTransactionResult {
 }
 
 const SETTLEMENT_TOKEN_DECIMALS = 6;
-const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
 
 const PERMIT2_TYPES: Record<string, TypedDataField[]> = {
   TokenPermissions: [
@@ -135,20 +133,17 @@ export class DepositClient {
 
   async getSettlementToken(): Promise<Address> {
     await this.assertRpcChainId();
-    return validateAddress(
-      await this.depositLedgerContract.SETTLEMENT_TOKEN(),
-      "$.settlementToken",
-    );
+    return parseAddress(await this.depositLedgerContract.SETTLEMENT_TOKEN(), "$.settlementToken");
   }
 
   async getPermit2(): Promise<Address> {
     await this.assertRpcChainId();
-    return validateAddress(await this.depositLedgerContract.PERMIT2(), "$.permit2");
+    return parseAddress(await this.depositLedgerContract.PERMIT2(), "$.permit2");
   }
 
   async getAccountLedger(): Promise<Address> {
     await this.assertRpcChainId();
-    return validateAddress(await this.depositLedgerContract.ACCOUNT_LEDGER(), "$.accountLedger");
+    return parseAddress(await this.depositLedgerContract.ACCOUNT_LEDGER(), "$.accountLedger");
   }
 
   async getPendingBalance(): Promise<bigint> {
@@ -188,7 +183,7 @@ export class DepositClient {
 
   async getSettlementTokenBalance(owner: Address = this.wallet.address): Promise<bigint> {
     await this.assertRpcChainId();
-    return (await this.getSettlementTokenContract()).balanceOf(validateAddress(owner, "$.owner"));
+    return (await this.getSettlementTokenContract()).balanceOf(parseAddress(owner, "$.owner"));
   }
 
   async getSettlementTokenAllowance(
@@ -197,8 +192,8 @@ export class DepositClient {
   ): Promise<bigint> {
     await this.assertRpcChainId();
     return (await this.getSettlementTokenContract()).allowance(
-      validateAddress(owner, "$.owner"),
-      validateAddress(spender, "$.spender"),
+      parseAddress(owner, "$.owner"),
+      parseAddress(spender, "$.spender"),
     );
   }
 
@@ -231,7 +226,7 @@ export class DepositClient {
     const amount = parsePositiveAmountInput(input.amount);
     const nonce = parseUnsignedInteger(input.nonce, "$.nonce", UINT256_MAX);
     const deadline = parseUnsignedInteger(input.deadline, "$.deadline", UINT256_MAX);
-    const owner = validateAddress(input.owner ?? this.wallet.address, "$.owner");
+    const owner = parseAddress(input.owner ?? this.wallet.address, "$.owner");
 
     if (!sameAddress(owner, this.wallet.address)) {
       throw createProtocolValidationError(
@@ -274,11 +269,11 @@ export class DepositClient {
       input.signature === undefined
         ? await this.signDepositPermit(input)
         : {
-            owner: validateAddress(input.owner ?? this.wallet.address, "$.owner"),
+            owner: parseAddress(input.owner ?? this.wallet.address, "$.owner"),
             amount: parsePositiveAmountInput(input.amount),
             nonce: parseUnsignedInteger(input.nonce, "$.nonce", UINT256_MAX),
             deadline: parseUnsignedInteger(input.deadline, "$.deadline", UINT256_MAX),
-            signature: validateHexData(input.signature, "$.signature"),
+            signature: parseHexData(input.signature, "$.signature"),
           };
 
     const tx = await this.depositLedgerContract.depositWithPermit(
@@ -359,31 +354,7 @@ function resolveDepositLedger(options: DepositClientOptions, chainId: bigint): A
     );
   }
 
-  return validateAddress(depositLedger, "$.depositLedger", false);
-}
-
-function validateAddress(input: unknown, path: string, allowZeroAddress = true): Address {
-  if (typeof input !== "string" || !isAddress(input)) {
-    throw createProtocolValidationError("invalid_value", path, "expected an EVM address");
-  }
-
-  if (!allowZeroAddress && sameAddress(input, ZeroAddress)) {
-    throw createProtocolValidationError("invalid_value", path, "expected a non-zero EVM address");
-  }
-
-  return input;
-}
-
-function validateHexData(input: unknown, path: string): HexString {
-  if (typeof input !== "string" || !HEX_DATA_PATTERN.test(input)) {
-    throw createProtocolValidationError(
-      "invalid_value",
-      path,
-      "expected 0x-prefixed hex data with an even byte length",
-    );
-  }
-
-  return input;
+  return parseNonZeroAddress(depositLedger, "$.depositLedger");
 }
 
 function parseSettlementTokenDecimals(decimals: number): number {
@@ -431,8 +402,4 @@ function getDepositQueuedTxId(receipt: ContractTransactionReceipt): bigint | und
   }
 
   return undefined;
-}
-
-function sameAddress(left: Address, right: Address): boolean {
-  return left.toLowerCase() === right.toLowerCase();
 }
