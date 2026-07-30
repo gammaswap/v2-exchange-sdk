@@ -12,6 +12,7 @@ test("package root and public subpath exports can be imported", async () => {
     import("@gammaswap/v2-exchange-sdk/deposit-client"),
     import("@gammaswap/v2-exchange-sdk/errors"),
     import("@gammaswap/v2-exchange-sdk/hashing"),
+    import("@gammaswap/v2-exchange-sdk/oracle-websocket"),
     import("@gammaswap/v2-exchange-sdk/schemas"),
     import("@gammaswap/v2-exchange-sdk/signing"),
     import("@gammaswap/v2-exchange-sdk/types"),
@@ -25,4 +26,7 @@ test("package root and public subpath exports can be imported", async () => {
 
   const websocketModule = modules.at(-1);
   assert.equal(typeof websocketModule.createExchangeWebSocketClient, "function");
+
+  const oracleWebsocketModule = modules.at(9);
+  assert.equal(typeof oracleWebsocketModule.createOracleWebSocketClient, "function");
 });

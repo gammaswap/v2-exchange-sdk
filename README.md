@@ -21,6 +21,7 @@ import {
   createExchangeClient,
   createDepositClient,
   createExchangeWebSocketClient,
+  createOracleWebSocketClient,
 } from "@gammaswap/v2-exchange-sdk";
 ```
 
@@ -28,6 +29,7 @@ Submodules are also exported:
 
 ```ts
 import { createExchangeWebSocketClient } from "@gammaswap/v2-exchange-sdk/websocket";
+import { createOracleWebSocketClient } from "@gammaswap/v2-exchange-sdk/oracle-websocket";
 import { TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
 ```
 
@@ -276,9 +278,79 @@ Subscription handlers:
   uses it when a socket is already considered unhealthy; otherwise it falls back
   to `close()`. Events from abandoned sockets are ignored so stale close/error
   events cannot affect a newer connection.
-- If an abandoned socket is still connected but reached its state after calling
-  `close()` then the socket will not respond to pings from the server and 
-  therefore will count on the server terminating the connection.
+- If an abandoned browser socket does not complete `close()` cleanly, the SDK has
+  no stronger browser-safe close primitive. The server heartbeat or TCP timeout
+  is the fallback that eventually reaps the old connection.
+
+## OracleWebSocketClient
+
+`OracleWebSocketClient` subscribes to oracle price streams by `symbolId`.
+
+```ts
+const oracle = createOracleWebSocketClient({
+  websocketUrl: "ws://127.0.0.1:8082",
+  stalePriceTimeoutMs: 30_000,
+  onError: (error) => console.error(error),
+});
+
+const unsubscribe = await oracle.subscribePrice("1", {
+  onPrice: (update) => console.log(update.symbolId, update.price, update.ts),
+  onStale: (symbolId) => {
+    console.log("oracle stream is stale for", symbolId);
+  },
+});
+
+await unsubscribe();
+oracle.close();
+```
+
+Constructor parameters:
+
+- `websocketUrl`: required oracle websocket endpoint URL.
+- `WebSocketCtor`: optional websocket constructor. Defaults to
+  `globalThis.WebSocket` when available, otherwise Node `ws`.
+- `reconnect`: optional boolean, defaults to `true`.
+- `reconnectDelayMs`: optional initial reconnect delay, defaults to `1000`.
+- `maxReconnectDelayMs`: optional reconnect delay cap, defaults to `30000`.
+- `ackTimeoutMs`: optional subscribe/unsubscribe acknowledgement timeout,
+  defaults to `15000`.
+- `stalePriceTimeoutMs`: optional maximum time without a price update for a
+  subscribed symbol, defaults to `30000`.
+- `onError`: optional global error callback.
+
+Available functions and properties:
+
+- `connectionState`
+- `connect()`
+- `close(code?, reason?)`
+- `subscribePrice(symbolId, handlers)`
+- `unsubscribePrice(symbolId)`
+
+Subscription handlers:
+
+- `onPrice(update)`
+- `onError(error)`
+- `onStale(symbolId)`
+
+### Notes:
+
+- One client can subscribe to multiple symbol IDs.
+- Subscribing multiple handlers to the same symbol ID sends one server
+  subscription and fans price updates out locally.
+- The unsubscribe function returned by `subscribePrice()` removes only that
+  handler. If no handlers remain for the symbol, the client sends an unsubscribe
+  message to the server.
+- `unsubscribePrice(symbolId)` removes all handlers for that symbol.
+- The oracle stream has no sequence ID and does not perform REST catch-up. If
+  the socket reconnects or a stale-price timeout fires, consumers should accept
+  the next live price update.
+- If no price arrives for a subscribed symbol within `stalePriceTimeoutMs`, the
+  client emits `onStale(symbolId)`, emits an error, abandons the socket, and
+  reconnects if subscriptions remain.
+- Unsubscribe acknowledgement failures are best-effort, matching the exchange
+  websocket behavior.
+- Failed sockets use optional Node-style `terminate()` when present and fall
+  back to browser-compatible `close()`.
 
 ## Sample Scripts
 

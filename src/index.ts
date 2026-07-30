@@ -8,6 +8,7 @@ export * from "./client.js";
 export * from "./decimal-inputs.js";
 export * from "./deposit-client.js";
 export * from "./websocket.js";
+export * from "./oracle-websocket.js";
 export * from "./errors.js";
 export * from "./constants.js";
 export * from "./utils.js";

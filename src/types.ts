@@ -728,6 +728,48 @@ export interface OrderBookSubscriptionHandlers {
 
 export type Unsubscribe = () => Promise<void>;
 
+export interface OracleWebSocketConnectedMessage {
+    type: "connected";
+    message: string;
+}
+
+export interface OracleWebSocketSubscribedMessage {
+    type: "subscribed";
+    symbolId: string;
+}
+
+export interface OracleWebSocketUnsubscribedMessage {
+    type: "unsubscribed";
+    symbolId: string;
+    reason?: string;
+}
+
+export interface OracleWebSocketErrorMessage {
+    type: "error";
+    message: string;
+}
+
+export type OracleWebSocketControlMessage =
+    | OracleWebSocketConnectedMessage
+    | OracleWebSocketSubscribedMessage
+    | OracleWebSocketUnsubscribedMessage
+    | OracleWebSocketErrorMessage;
+
+export interface OraclePriceUpdate {
+    type: "price";
+    symbolId: bigint;
+    price: bigint;
+    ts: bigint;
+}
+
+export type OracleWebSocketMessage = OracleWebSocketControlMessage | OraclePriceUpdate;
+
+export interface OraclePriceSubscriptionHandlers {
+    onPrice?: (update: OraclePriceUpdate) => void;
+    onError?: (error: unknown) => void;
+    onStale?: (symbolId: string) => void;
+}
+
 export interface Asset {
     strikePrice: bigint;
     ledger: string;

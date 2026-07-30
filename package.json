@@ -44,6 +44,10 @@
       "types": "./dist/hashing.d.ts",
       "import": "./dist/hashing.js"
     },
+    "./oracle-websocket": {
+      "types": "./dist/oracle-websocket.d.ts",
+      "import": "./dist/oracle-websocket.js"
+    },
     "./schemas": {
       "types": "./dist/schemas.d.ts",
       "import": "./dist/schemas.js"

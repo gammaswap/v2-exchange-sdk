@@ -25,6 +25,9 @@ import type {
   GetOrderBookRequest,
   GetPositionRequest,
   GetTopOfBookRequest,
+  OraclePriceUpdate,
+  OracleWebSocketControlMessage,
+  OracleWebSocketMessage,
   OrderEvent,
   ProtocolJson,
   ResolutionEvent,
@@ -724,6 +727,40 @@ export function parseWebSocketMarketUpdate(input: unknown): WebSocketMarketUpdat
   return message;
 }
 
+export function parseOracleWebSocketMessage(input: unknown): OracleWebSocketMessage {
+  const record = parseObject(input, "$");
+  const type = parseString(getRequiredField(record, "type", "$"), "$.type");
+
+  if (
+    type === "connected" ||
+    type === "subscribed" ||
+    type === "unsubscribed" ||
+    type === "error"
+  ) {
+    return parseOracleWebSocketControlMessage(record, type);
+  }
+
+  if (type === "price") {
+    return parseOraclePriceUpdateRecord(record);
+  }
+
+  throw createProtocolValidationError(
+    "invalid_value",
+    "$.type",
+    "unknown oracle websocket message type",
+  );
+}
+
+export function parseOraclePriceUpdate(input: unknown): OraclePriceUpdate {
+  const message = parseOracleWebSocketMessage(input);
+
+  if (message.type !== "price") {
+    throw createProtocolValidationError("invalid_value", "$.type", "expected oracle price update");
+  }
+
+  return message;
+}
+
 function parseWebSocketControlMessage(
   record: Record<string, unknown>,
   type: string,
@@ -776,6 +813,67 @@ function parseWebSocketMarketUpdateRecord(
 
   const data = parseResolutionEvent(dataInput, "$.data");
   return { type, seqId, assetId: data.assetId, epoch: data.epoch, data };
+}
+
+function parseOracleWebSocketControlMessage(
+  record: Record<string, unknown>,
+  type: string,
+): OracleWebSocketControlMessage {
+  if (type === "connected") {
+    return {
+      type,
+      message: parseString(getRequiredField(record, "message", "$"), "$.message"),
+    };
+  }
+
+  if (type === "subscribed") {
+    return {
+      type: "subscribed",
+      symbolId: parseUnsignedInteger(
+        getRequiredField(record, "symbolId", "$"),
+        "$.symbolId",
+        UINT256_MAX,
+      ).toString(),
+    };
+  }
+
+  if (type === "unsubscribed") {
+    const message = {
+      type: "unsubscribed" as const,
+      symbolId: parseUnsignedInteger(
+        getRequiredField(record, "symbolId", "$"),
+        "$.symbolId",
+        UINT256_MAX,
+      ).toString(),
+    };
+    const reason = record.reason;
+    if (reason !== undefined) {
+      return {
+        ...message,
+        reason: parseString(reason, "$.reason"),
+      };
+    }
+
+    return message;
+  }
+
+  return {
+    type: "error",
+    message: parseString(getRequiredField(record, "message", "$"), "$.message"),
+  };
+}
+
+function parseOraclePriceUpdateRecord(record: Record<string, unknown>): OraclePriceUpdate {
+  return {
+    type: "price",
+    symbolId: parseUnsignedInteger(
+      getRequiredField(record, "symbolId", "$"),
+      "$.symbolId",
+      UINT256_MAX,
+    ),
+    price: parseUnsignedInteger(getRequiredField(record, "price", "$"), "$.price", UINT256_MAX),
+    ts: parseWebSocketSeqId(getRequiredField(record, "ts", "$"), "$.ts"),
+  };
 }
 
 function parseOrderEvent(input: unknown, path: string): OrderEvent {
