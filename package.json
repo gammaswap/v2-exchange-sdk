@@ -132,6 +132,7 @@
     "sample:agent:cancel-replace": "tsx scripts/sample/sendTestAgentCancelReplace.ts",
     "sample:agent:claim": "tsx scripts/sample/sendTestAgentClaim.ts",
     "sample:ws:book": "tsx scripts/sample/wsBookTest.ts",
+    "sample:ws:oracle": "tsx scripts/sample/wsOracleTest.ts",
     "prepublishOnly": "pnpm build"
   },
   "repository": {
