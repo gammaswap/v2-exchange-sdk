@@ -1,8 +1,8 @@
-import { ExchangeSdkError, createProtocolValidationError } from "./errors.js";
+import { ExchangeSdkError } from "./errors.js";
+import { UINT256_MAX, parsePositiveIntegerOption, parseUnsignedInteger } from "./integer-inputs.js";
 import { parseOracleWebSocketMessage } from "./schemas.js";
 import {
   BaseSubscriptionWebSocketClient,
-  parsePositiveIntegerOption,
   type SubscriptionWebSocketClientOptions,
   type WebSocketConstructorLike,
   type WebSocketLike,
@@ -24,8 +24,6 @@ export interface OracleWebSocketClientOptions extends SubscriptionWebSocketClien
 }
 
 const DEFAULT_STALE_PRICE_TIMEOUT_MS = 30_000;
-const UINT256_MAX = 2n ** 256n - 1n;
-const DECIMAL_STRING_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 export class OracleWebSocketClient extends BaseSubscriptionWebSocketClient<
   OraclePriceSubscriptionHandlers,
@@ -222,34 +220,5 @@ export function createOracleWebSocketClient(
 }
 
 function normalizeSymbolId(input: ProtocolBigNumberish): string {
-  let value: bigint;
-
-  if (typeof input === "bigint") {
-    value = input;
-  } else if (typeof input === "string") {
-    if (!DECIMAL_STRING_PATTERN.test(input)) {
-      throw createProtocolValidationError(
-        "invalid_decimal_string",
-        "$.symbolId",
-        "expected a canonical unsigned decimal string",
-      );
-    }
-    value = BigInt(input);
-  } else {
-    throw createProtocolValidationError(
-      "invalid_type",
-      "$.symbolId",
-      "expected bigint or canonical unsigned decimal string",
-    );
-  }
-
-  if (value < 0n || value > UINT256_MAX) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      "$.symbolId",
-      `expected integer in range 0..${UINT256_MAX.toString()}`,
-    );
-  }
-
-  return value.toString();
+  return parseUnsignedInteger(input, "$.symbolId", UINT256_MAX).toString();
 }

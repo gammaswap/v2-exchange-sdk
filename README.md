@@ -30,6 +30,7 @@ Submodules are also exported:
 ```ts
 import { createExchangeWebSocketClient } from "@gammaswap/v2-exchange-sdk/websocket";
 import { createOracleWebSocketClient } from "@gammaswap/v2-exchange-sdk/oracle-websocket";
+import { parseUnsignedInteger } from "@gammaswap/v2-exchange-sdk/integer-inputs";
 import { TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
 ```
 
@@ -46,6 +47,11 @@ Order and transfer inputs use human decimal strings:
   `99.9` becomes `999000n` in protocol units.
 - Invalid precision, zero amounts, out-of-range values, invalid nonces, and
   invalid hashes throw validation errors before the SDK sends a request.
+
+Integer-only helpers are exported from `@gammaswap/v2-exchange-sdk/integer-inputs`
+for canonical unsigned decimal strings and bigint values. They intentionally
+reject JavaScript numbers unless a helper is explicitly for safe JSON/runtime
+integers.
 
 ## InfoClient
 
@@ -248,7 +254,7 @@ ws.close();
 - `subscribeOrderBook(assetId, handlers)`
 - `unsubscribeOrderBook(assetId)`
 
-Subscription handlers:
+### Subscription handlers:
 
 - `onUpdate(update)`
 - `onOrder(update)`
@@ -304,7 +310,7 @@ await unsubscribe();
 oracle.close();
 ```
 
-Constructor parameters:
+### Constructor parameters:
 
 - `websocketUrl`: required oracle websocket endpoint URL.
 - `WebSocketCtor`: optional websocket constructor. Defaults to
@@ -318,7 +324,7 @@ Constructor parameters:
   subscribed symbol, defaults to `30000`.
 - `onError`: optional global error callback.
 
-Available functions and properties:
+### Available functions and properties:
 
 - `connectionState`
 - `connect()`
@@ -326,7 +332,7 @@ Available functions and properties:
 - `subscribePrice(symbolId, handlers)`
 - `unsubscribePrice(symbolId)`
 
-Subscription handlers:
+### Subscription handlers:
 
 - `onPrice(update)`
 - `onError(error)`

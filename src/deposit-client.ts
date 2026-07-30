@@ -14,6 +14,7 @@ import { getDefaultExchangeChainConfig } from "./config.js";
 import { parseAmountInput, parsePositiveAmountInput } from "./decimal-inputs.js";
 import { createProtocolValidationError, ExchangeSdkError } from "./errors.js";
 import { getExchangeConfigRequestSchema, parseExchangeContracts } from "./schemas.js";
+import { UINT256_MAX, parseUnsignedInteger } from "./integer-inputs.js";
 import type {
   Address,
   ExchangeContractsInput,
@@ -57,8 +58,6 @@ export interface DepositTransactionResult extends OnchainTransactionResult {
 }
 
 const SETTLEMENT_TOKEN_DECIMALS = 6;
-const UINT256_MAX = 2n ** 256n - 1n;
-const DECIMAL_INTEGER_PATTERN = /^(0|[1-9][0-9]*)$/;
 const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
 
 const PERMIT2_TYPES: Record<string, TypedDataField[]> = {
@@ -385,39 +384,6 @@ function validateHexData(input: unknown, path: string): HexString {
   }
 
   return input;
-}
-
-function parseUnsignedInteger(input: unknown, path: string, max: bigint): bigint {
-  let value: bigint;
-
-  if (typeof input === "bigint") {
-    value = input;
-  } else if (typeof input === "string") {
-    if (!DECIMAL_INTEGER_PATTERN.test(input)) {
-      throw createProtocolValidationError(
-        "invalid_decimal_string",
-        path,
-        "expected a canonical unsigned decimal string",
-      );
-    }
-    value = BigInt(input);
-  } else {
-    throw createProtocolValidationError(
-      "invalid_type",
-      path,
-      "expected bigint or canonical unsigned decimal string",
-    );
-  }
-
-  if (value < 0n || value > max) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      path,
-      `expected integer in range 0..${max.toString()}`,
-    );
-  }
-
-  return value;
 }
 
 function parseSettlementTokenDecimals(decimals: number): number {

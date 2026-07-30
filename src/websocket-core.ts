@@ -1,5 +1,6 @@
 import NodeWebSocket from "ws";
 import { ExchangeSdkError, createProtocolValidationError } from "./errors.js";
+import { parseNonNegativeIntegerOption, parsePositiveIntegerOption } from "./integer-inputs.js";
 import type { Unsubscribe, WebSocketConnectionState } from "./types.js";
 
 export interface WebSocketLike {
@@ -656,20 +657,4 @@ function formatUnknown(input: unknown): string {
   }
 
   return "unknown";
-}
-
-function parseNonNegativeIntegerOption(input: number, path: string): number {
-  if (!Number.isInteger(input) || input < 0) {
-    throw createProtocolValidationError("invalid_value", path, "expected a non-negative integer");
-  }
-
-  return input;
-}
-
-export function parsePositiveIntegerOption(input: number, path: string): number {
-  if (!Number.isInteger(input) || input <= 0) {
-    throw createProtocolValidationError("invalid_value", path, "expected a positive integer");
-  }
-
-  return input;
 }

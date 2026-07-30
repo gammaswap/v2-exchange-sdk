@@ -55,6 +55,7 @@ import {
   toJsonExchangeChainConfig,
 } from "./schemas.js";
 import { signOrderJS } from "./signing.js";
+import { UINT32_MAX, parseUnsignedInteger } from "./integer-inputs.js";
 import type {
   Address,
   Eip712AgentApproval,
@@ -150,11 +151,9 @@ interface CancelReplaceSigningInput extends Omit<BuildCancelReplaceInput, "repla
   timeInForce: ProtocolBigNumberish;
 }
 
-const UINT32_MAX = 2n ** 32n - 1n;
 const MIN_AGENT_ACTION_APPROVAL_NONCE = 1_780_272_000n;
 const APPROVE_AGENT_MIN_FUTURE_SECONDS = 10n;
 const APPROVE_AGENT_MAX_FUTURE_SECONDS = 5n * 60n;
-const DECIMAL_STRING_PATTERN = /^(0|[1-9][0-9]*)$/;
 
 export class InfoClient {
   readonly apiUrl: string;
@@ -733,31 +732,11 @@ function parseAgentStatusResponse(data: unknown): AgentStatusResponse {
     );
   }
 
-  const nonce = data.nonce;
-  if (typeof nonce !== "string" && typeof nonce !== "bigint") {
-    throw createProtocolValidationError(
-      "invalid_type",
-      "$.nonce",
-      "agent status nonce must be a bigint or decimal string",
-    );
-  }
-
-  if (typeof nonce === "string" && !DECIMAL_STRING_PATTERN.test(nonce)) {
-    throw createProtocolValidationError(
-      "invalid_decimal_string",
-      "$.nonce",
-      "agent status nonce must be a canonical unsigned decimal string",
-    );
-  }
-
-  const value = BigInt(nonce);
-  if (value < 0n || value > UINT32_MAX) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      "$.nonce",
-      `agent status nonce must be in range 0..${UINT32_MAX.toString()}`,
-    );
-  }
+  const value = parseUnsignedInteger(data.nonce, "$.nonce", UINT32_MAX, {
+    invalidType: "agent status nonce must be a bigint or decimal string",
+    invalidDecimalString: "agent status nonce must be a canonical unsigned decimal string",
+    outOfRange: (max) => `agent status nonce must be in range 0..${max.toString()}`,
+  });
 
   return { nonce: value };
 }
@@ -794,36 +773,11 @@ function parseApproveAgentApprovalNonce(input: unknown, path = "$.approvalNonce"
 }
 
 function parseApprovalNonceInteger(input: unknown, path: string): bigint {
-  let value: bigint;
-
-  if (typeof input === "bigint") {
-    value = input;
-  } else if (typeof input === "string") {
-    if (!DECIMAL_STRING_PATTERN.test(input)) {
-      throw createProtocolValidationError(
-        "invalid_decimal_string",
-        path,
-        "approvalNonce must be a canonical unsigned decimal string",
-      );
-    }
-    value = BigInt(input);
-  } else {
-    throw createProtocolValidationError(
-      "invalid_type",
-      path,
-      "approvalNonce must be a bigint or decimal string",
-    );
-  }
-
-  if (value < 0n || value > UINT32_MAX) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      path,
-      `approvalNonce must be in range 0..${UINT32_MAX.toString()}`,
-    );
-  }
-
-  return value;
+  return parseUnsignedInteger(input, path, UINT32_MAX, {
+    invalidType: "approvalNonce must be a bigint or decimal string",
+    invalidDecimalString: "approvalNonce must be a canonical unsigned decimal string",
+    outOfRange: (max) => `approvalNonce must be in range 0..${max.toString()}`,
+  });
 }
 
 function isSameAddress(left: unknown, right: string): boolean {

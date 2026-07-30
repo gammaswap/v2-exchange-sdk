@@ -1,6 +1,16 @@
 import { isAddress } from "ethers";
 import { OrderType, SignatureType, TimeInForce } from "./constants.js";
 import { createProtocolValidationError } from "./errors.js";
+import {
+  UINT8_MAX,
+  UINT24_MAX,
+  UINT32_MAX,
+  UINT64_MAX,
+  UINT128_MAX,
+  UINT256_MAX,
+  parseSafeJsonUnsignedInteger,
+  parseUnsignedInteger,
+} from "./integer-inputs.js";
 import type {
   Eip712AgentApproval,
   Eip712ApproveAgent,
@@ -95,14 +105,6 @@ export type Eip712ActionJson =
   | ProtocolJson<Eip712Invalidate>
   | ProtocolJson<Eip712OnchainDeposit>;
 
-const UINT8_MAX = 2n ** 8n - 1n;
-const UINT24_MAX = 2n ** 24n - 1n;
-const UINT32_MAX = 2n ** 32n - 1n;
-const UINT64_MAX = 2n ** 64n - 1n;
-const UINT128_MAX = 2n ** 128n - 1n;
-const UINT256_MAX = 2n ** 256n - 1n;
-
-const DECIMAL_STRING_PATTERN = /^(0|[1-9][0-9]*)$/;
 const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
 const BYTES32_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 
@@ -162,39 +164,6 @@ function parseObject(input: unknown, path: string): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
-function parseUnsignedInteger(input: unknown, path: string, max: bigint): bigint {
-  let value: bigint;
-
-  if (typeof input === "bigint") {
-    value = input;
-  } else if (typeof input === "string") {
-    if (!DECIMAL_STRING_PATTERN.test(input)) {
-      throw createProtocolValidationError(
-        "invalid_decimal_string",
-        path,
-        "expected a canonical unsigned decimal string",
-      );
-    }
-    value = BigInt(input);
-  } else {
-    throw createProtocolValidationError(
-      "invalid_type",
-      path,
-      "expected bigint or canonical unsigned decimal string",
-    );
-  }
-
-  if (value < 0n || value > max) {
-    throw createProtocolValidationError(
-      "integer_out_of_range",
-      path,
-      `expected integer in range 0..${max.toString()}`,
-    );
-  }
-
-  return value;
-}
-
 function parseAddress(input: unknown, path: string): string {
   if (typeof input !== "string" || !isAddress(input)) {
     throw createProtocolValidationError("invalid_value", path, "expected an EVM address");
@@ -248,19 +217,12 @@ function getRequiredField(record: Record<string, unknown>, key: string, path: st
 }
 
 function parseWebSocketSeqId(input: unknown, path: string): bigint {
-  if (typeof input === "number") {
-    if (!Number.isSafeInteger(input) || input < 0) {
-      throw createProtocolValidationError(
-        "invalid_type",
-        path,
-        "expected a safe unsigned integer sequence id",
-      );
-    }
-
-    return BigInt(input);
-  }
-
-  return parseUnsignedInteger(input, path, UINT64_MAX);
+  return parseSafeJsonUnsignedInteger(
+    input,
+    path,
+    UINT64_MAX,
+    "expected a safe unsigned integer sequence id",
+  );
 }
 
 function parseExpectedInteger(

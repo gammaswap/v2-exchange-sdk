@@ -1,4 +1,5 @@
 import { createProtocolValidationError } from "./errors.js";
+import { UINT256_MAX } from "./integer-inputs.js";
 import type { HumanDecimalString } from "./types.js";
 
 export const PROTOCOL_DECIMALS = 6;
@@ -12,7 +13,6 @@ export const MAX_SIZE_PROTOCOL_UNITS = 1_000_000_000_000_000n;
 export const MAX_AMOUNT_PROTOCOL_UNITS = MAX_SIZE_PROTOCOL_UNITS;
 
 const PROTOCOL_SCALE = 1_000_000n;
-const UINT256_MAX = 2n ** 256n - 1n;
 const PRICE_TENTH_CENT_TO_PROTOCOL_UNITS = 1_000n;
 const MIN_PRICE_TENTH_CENTS = 1n;
 const MAX_PRICE_TENTH_CENTS = 999n;

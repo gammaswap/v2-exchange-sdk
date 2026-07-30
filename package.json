@@ -44,6 +44,10 @@
       "types": "./dist/hashing.d.ts",
       "import": "./dist/hashing.js"
     },
+    "./integer-inputs": {
+      "types": "./dist/integer-inputs.d.ts",
+      "import": "./dist/integer-inputs.js"
+    },
     "./oracle-websocket": {
       "types": "./dist/oracle-websocket.d.ts",
       "import": "./dist/oracle-websocket.js"
