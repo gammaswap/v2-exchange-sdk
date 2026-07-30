@@ -256,6 +256,96 @@ test("ExchangeWebSocketClient reconnects, resubscribes, and signals resync", asy
   assert.deepEqual(reconnectedSocket.sentJson(0), { type: "subscribe", assetId: ASSET_ID });
 });
 
+test("ExchangeWebSocketClient treats unsubscribe acknowledgement timeouts as best-effort", async () => {
+  const errors = [];
+  const client = createClient({
+    onError: (error) => errors.push(error),
+  });
+  const { unsubscribe, socket } = await subscribe(client);
+
+  await unsubscribe();
+
+  assert.deepEqual(socket.sentJson(1), { type: "unsubscribe", assetId: ASSET_ID });
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0] instanceof ExchangeSdkError);
+  assert.match(errors[0].message, /Timed out waiting for unsubscribe acknowledgement/);
+  assert.equal(client.connectionState, "closed");
+  assert.equal(FakeWebSocket.instances.length, 1);
+});
+
+test("ExchangeWebSocketClient reconnects remaining subscriptions after unsubscribe acknowledgement timeout", async () => {
+  const errors = [];
+  const resyncs = [];
+  const client = createClient({
+    onError: (error) => errors.push(error),
+  });
+  const { unsubscribe, socket } = await subscribe(client, ASSET_ID, {
+    onResyncRequired: (assetId) => resyncs.push(assetId),
+  });
+  const secondSubscribePromise = client.subscribeOrderBook(OTHER_ASSET_ID, {
+    onResyncRequired: (assetId) => resyncs.push(assetId),
+  });
+
+  await settle();
+  assert.deepEqual(socket.sentJson(1), { type: "subscribe", assetId: OTHER_ASSET_ID });
+  socket.serverMessage({ type: "subscribed", assetId: OTHER_ASSET_ID });
+  await secondSubscribePromise;
+
+  await unsubscribe();
+
+  assert.deepEqual(socket.sentJson(2), { type: "unsubscribe", assetId: ASSET_ID });
+  assert.equal(errors.length, 1);
+  assert.deepEqual(resyncs, [OTHER_ASSET_ID]);
+
+  await settle();
+  const reconnectedSocket = FakeWebSocket.latest();
+  assert.notEqual(reconnectedSocket, socket);
+  reconnectedSocket.open();
+  await settle();
+
+  assert.deepEqual(reconnectedSocket.sentJson(0), {
+    type: "subscribe",
+    assetId: OTHER_ASSET_ID,
+  });
+
+  client.close();
+});
+
+test("ExchangeWebSocketClient reconnects existing subscriptions after subscribe acknowledgement timeout", async () => {
+  const errors = [];
+  const resyncs = [];
+  const client = createClient({
+    onError: (error) => errors.push(error),
+  });
+  const { socket } = await subscribe(client, ASSET_ID, {
+    onResyncRequired: (assetId) => resyncs.push(assetId),
+  });
+  const subscribePromise = client.subscribeOrderBook(OTHER_ASSET_ID, {
+    onResyncRequired: (assetId) => resyncs.push(assetId),
+  });
+
+  await settle();
+  assert.deepEqual(socket.sentJson(1), { type: "subscribe", assetId: OTHER_ASSET_ID });
+  await assert.rejects(subscribePromise, (error) => {
+    assert.ok(error instanceof ExchangeSdkError);
+    assert.match(error.message, /Timed out waiting for subscribe acknowledgement/);
+    return true;
+  });
+
+  assert.equal(errors.length, 1);
+  assert.deepEqual(resyncs, [ASSET_ID]);
+
+  await settle();
+  const reconnectedSocket = FakeWebSocket.latest();
+  assert.notEqual(reconnectedSocket, socket);
+  reconnectedSocket.open();
+  await settle();
+
+  assert.deepEqual(reconnectedSocket.sentJson(0), { type: "subscribe", assetId: ASSET_ID });
+
+  client.close();
+});
+
 test("ExchangeWebSocketClient surfaces malformed websocket messages through error handlers", async () => {
   const errors = [];
   const client = createClient({

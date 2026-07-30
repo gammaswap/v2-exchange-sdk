@@ -165,6 +165,7 @@ export class ExchangeWebSocketClient {
       if (handlersForAsset === undefined || handlersForAsset.size === 0) {
         this.subscriptions.delete(assetId);
       }
+      this.handleConnectionFailure(error);
       throw error;
     }
 
@@ -210,7 +211,7 @@ export class ExchangeWebSocketClient {
 
     this.subscriptions.delete(assetId);
     if (this.isOpen()) {
-      await this.unsubscribeAssetOnServer(assetId);
+      await this.unsubscribeAssetOnServerBestEffort(assetId);
     }
   }
 
@@ -243,6 +244,14 @@ export class ExchangeWebSocketClient {
     } catch (error) {
       this.clearPendingAck(this.pendingUnsubscribes, assetId);
       throw error;
+    }
+  }
+
+  private async unsubscribeAssetOnServerBestEffort(assetId: string): Promise<void> {
+    try {
+      await this.unsubscribeAssetOnServer(assetId);
+    } catch (error) {
+      this.handleConnectionFailure(error);
     }
   }
 
@@ -321,13 +330,19 @@ export class ExchangeWebSocketClient {
   }
 
   private attachSocketListeners(socket: WebSocketLike): void {
-    addSocketListener(socket, "open", () => this.handleOpen());
-    addSocketListener(socket, "message", (event) => this.handleMessageEvent(event));
-    addSocketListener(socket, "error", (event) => this.handleErrorEvent(event));
-    addSocketListener(socket, "close", (event, reason) => this.handleCloseEvent(event, reason));
+    addSocketListener(socket, "open", () => this.handleOpen(socket));
+    addSocketListener(socket, "message", (event) => this.handleMessageEvent(socket, event));
+    addSocketListener(socket, "error", (event) => this.handleErrorEvent(socket, event));
+    addSocketListener(socket, "close", (event, reason) =>
+      this.handleCloseEvent(socket, event, reason),
+    );
   }
 
-  private handleOpen(): void {
+  private handleOpen(socket: WebSocketLike): void {
+    if (socket !== this.socket) {
+      return;
+    }
+
     const wasReconnecting = this.state === "reconnecting";
     this.state = "open";
     this.reconnectAttempt = 0;
@@ -338,7 +353,11 @@ export class ExchangeWebSocketClient {
     }
   }
 
-  private handleMessageEvent(event: unknown): void {
+  private handleMessageEvent(socket: WebSocketLike, event: unknown): void {
+    if (socket !== this.socket) {
+      return;
+    }
+
     try {
       const rawData = getMessageEventData(event);
       const parsedJson = JSON.parse(messageDataToString(rawData)) as unknown;
@@ -414,11 +433,19 @@ export class ExchangeWebSocketClient {
     }
   }
 
-  private handleErrorEvent(event: unknown): void {
+  private handleErrorEvent(socket: WebSocketLike, event: unknown): void {
+    if (socket !== this.socket) {
+      return;
+    }
+
     this.emitError(extractError(event));
   }
 
-  private handleCloseEvent(event: unknown, reason?: unknown): void {
+  private handleCloseEvent(socket: WebSocketLike, event: unknown, reason?: unknown): void {
+    if (socket !== this.socket) {
+      return;
+    }
+
     const error = closeEventToError(event, reason);
     const shouldReconnect = !this.manuallyClosed && this.reconnect && this.subscriptions.size > 0;
 
@@ -434,6 +461,33 @@ export class ExchangeWebSocketClient {
       this.scheduleReconnect();
     } else {
       this.state = "closed";
+    }
+  }
+
+  private handleConnectionFailure(error: unknown): void {
+    this.emitError(error);
+
+    const socket = this.socket;
+    this.socket = undefined;
+    this.rejectPendingAcks(error);
+    this.rejectConnect(error);
+
+    if (!this.manuallyClosed && this.subscriptions.size > 0) {
+      this.emitResyncRequiredForAll();
+    }
+
+    if (!this.manuallyClosed && this.reconnect && this.subscriptions.size > 0) {
+      this.scheduleReconnect();
+    } else {
+      this.state = "closed";
+    }
+
+    if (socket !== undefined && (socket.readyState === CONNECTING || socket.readyState === OPEN)) {
+      try {
+        socket.close();
+      } catch (closeError) {
+        this.emitError(closeError);
+      }
     }
   }
 
