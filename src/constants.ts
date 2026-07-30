@@ -115,3 +115,26 @@ export const REVOKE_AGENT_ORDER_TYPEHASH = keccak256(
 export const AGENT_APPROVAL_TYPEHASH = keccak256(
   Buffer.from("AgentApproval(address master,address agent,uint32 nonce)"),
 );
+
+export const DEPOSIT_LEDGER_ABI = [
+    "event DepositQueued(uint256 indexed index,address indexed user,uint256 amount)",
+    "function SETTLEMENT_TOKEN() view returns (address)",
+    "function ACCOUNT_LEDGER() view returns (address)",
+    "function PERMIT2() view returns (address)",
+    "function pendingBalance() view returns (uint256)",
+    "function processedBalance() view returns (uint256)",
+    "function pendingDepositCount() view returns (uint128)",
+    "function nextPendingDepositId() view returns (uint128)",
+    "function processedDepositIndex() view returns (uint128)",
+    "function minBlockWait() view returns (uint256)",
+    "function canProcessNext() view returns (bool)",
+    "function deposit(uint256 amount)",
+    "function depositWithPermit(uint256 amount,uint256 nonce,address owner,uint256 deadline,bytes signature)",
+] as const;
+
+export const ERC20_ABI = [
+    "function approve(address spender,uint256 amount) returns (bool)",
+    "function allowance(address owner,address spender) view returns (uint256)",
+    "function balanceOf(address owner) view returns (uint256)",
+    "function decimals() view returns (uint8)",
+] as const;

@@ -2,29 +2,23 @@ import 'dotenv/config';
 import { Wallet } from "ethers";
 import axios from "axios";
 import {
-    signOrderJS,
     validateSignatureJS,
-} from "../signing.js";
-import {
+    signOrderJS,
     hashCancelReplaceOrderJS,
     hashFillOrderJS,
-} from "../hashing.js";
-import { deriveAccountsFromMnemonic } from "../utils.js";
-import {
+    deriveAccountsFromMnemonic,
     Eip712CancelReplace,
     Eip712Order,
-} from "../types.js";
-import {
     OrderType,
-    SignatureType,
-} from "../constants.js";
+    SignatureType
+} from "@gammaswap/v2-exchange-sdk";
 
 const CHAIN_ID = process.env.CHAIN_ID || "31337";
-const LEDGER_ADDRESS = process.env.LEDGER_CONTRACT || "0x0000000000000000000000000000000000000000";
-const SETTLEMENT_TOKEN_ADDRESS = process.env.SETTLEMENT_TOKEN || "0x0000000000000000000000000000000000000000";
 const MNEMONIC = process.env.TEST_MNEMONIC || "test test test test test test test test test test test junk";
 const CANCEL_REPLACE_ENDPOINT = process.env.CANCEL_REPLACE_ENDPOINT || "http://localhost:3000/cancel-replace";
+const AGENT_STATUS_ENDPOINT = process.env.AGENT_STATUS_ENDPOINT || "http://localhost:3000/agents/status";
 const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0");
+const AGENT_INDEX = Number(process.env.AGENT_INDEX || "1");
 const ASSET_ID = process.env.ASSET_ID || "261336857817713630688382311349658711122006440411137";
 const EPOCH = process.env.EPOCH || "0";
 
@@ -53,21 +47,21 @@ function parseBoolean(value: string | undefined): boolean {
     throw new Error(`Invalid allOrNothing ${value}; expected true or false`);
 }
 
-// run with "npx ts-node ./src/test/sendTestCancelReplace.ts <cancelOrderHash> <buy|sell> <size> <price> [gtc|fok|ioc|alo] [allOrNothing]"
-// from root run with "pnpm --filter @v2-exchange/exchange-api cancel-replace <cancelOrderHash> buy 100000000 500000"
-// from root run with "pnpm --filter @v2-exchange/exchange-api cancel-replace <cancelOrderHash> sell 100000000 550000 ioc"
+// run with "npx ts-node ./src/test/sendTestAgentCancelReplace.ts <cancelOrderHash> <buy|sell> <size> <price> [gtc|fok|ioc|alo] [allOrNothing]"
+// from root run with "pnpm --filter @v2-exchange/exchange-api agent:cancel-replace <cancelOrderHash> buy 100000000 500000"
+// from root run with "pnpm --filter @v2-exchange/exchange-api agent:cancel-replace <cancelOrderHash> sell 100000000 550000 ioc"
 async function main() {
     console.log("CHAIN_ID:", CHAIN_ID);
-    console.log("LEDGER_ADDRESS:", LEDGER_ADDRESS);
-    console.log("SETTLEMENT_TOKEN_ADDRESS:", SETTLEMENT_TOKEN_ADDRESS);
     const account = deriveAccountsFromMnemonic(MNEMONIC, WALLET_INDEX + 1)[WALLET_INDEX];
-    console.log("Using address:", account.address);
+    console.log("Using account address:", account.address);
+    const agent = deriveAccountsFromMnemonic(MNEMONIC, AGENT_INDEX + 1)[AGENT_INDEX];
+    console.log("Using agent address:", agent.address);
     const args = process.argv.slice(2);
     console.log("args:", args);
 
     const cancelOrderHash = args[0]?.trim().toLowerCase();
     if(!cancelOrderHash) {
-        console.log("Usage: cancel-replace <cancelOrderHash> <buy|sell> <size> <price> [gtc|fok|ioc|alo] [allOrNothing]");
+        console.log("Usage: agent:cancel-replace <cancelOrderHash> <buy|sell> <size> <price> [gtc|fok|ioc|alo] [allOrNothing]");
         return;
     }
 
@@ -81,14 +75,32 @@ async function main() {
     const replacementTimeInForce = parseTimeInForce(args[4]);
     const allOrNothing = parseBoolean(args[5]);
 
-    const wallet = new Wallet(account.privateKey);
+    let approvalNonce = 0n;
+    try {
+        const res = await axios.get(AGENT_STATUS_ENDPOINT + `/${account.address}`);
+        console.log("Agent status response:", res.status, res.data);
+        approvalNonce = BigInt(res.data.nonce);
+    } catch (err: any) {
+        if (err.response) {
+            console.error(
+                "Error response:",
+                err.response.status,
+                err.response.data
+            );
+        } else {
+            console.error("Request error:", err.message);
+        }
+        return;
+    }
+
+    const wallet = new Wallet(agent.privateKey);
     console.log("wallet:", wallet.address);
 
     const replacement: Eip712Order = {
         typ: OrderType.FILL,
         nonce: BigInt(Date.now()),
-        signer: account.address,
-        signatureType: SignatureType.EOA,
+        signer: agent.address,
+        signatureType: SignatureType.AGENT,
         sender: account.address,
         side: replacementSide,
         assetId: BigInt(ASSET_ID),
@@ -96,7 +108,7 @@ async function main() {
         size: replacementSize,
         price: replacementPrice,
         timeInForce: replacementTimeInForce,
-        approvalNonce: 0n,
+        approvalNonce,
     };
 
     const replacementOrderHash = hashFillOrderJS(replacement);
@@ -109,14 +121,14 @@ async function main() {
     const cancelReplace: Eip712CancelReplace = {
         typ: OrderType.CANCEL_REPLACE,
         nonce: replacement.nonce + 1n,
-        signer: account.address,
-        signatureType: SignatureType.EOA,
+        signer: agent.address,
+        signatureType: SignatureType.AGENT,
         sender: account.address,
         assetId: BigInt(ASSET_ID),
         epoch: BigInt(EPOCH),
         cancelOrderHash,
         replacementOrderHash,
-        approvalNonce: 0n,
+        approvalNonce,
         allOrNothing,
     };
 
@@ -133,9 +145,9 @@ async function main() {
         cancelReplace: {
             typ: cancelReplace.typ.toString(),
             nonce: cancelReplace.nonce.toString(),
-            signer: wallet.address,
+            signer: cancelReplace.signer.toString(),
             signatureType: cancelReplace.signatureType.toString(),
-            sender: wallet.address,
+            sender: cancelReplace.sender.toString(),
             assetId: cancelReplace.assetId.toString(),
             epoch: cancelReplace.epoch.toString(),
             cancelOrderHash: cancelReplace.cancelOrderHash,
@@ -146,9 +158,9 @@ async function main() {
         replacement: {
             typ: replacement.typ.toString(),
             nonce: replacement.nonce.toString(),
-            signer: wallet.address,
+            signer: replacement.signer.toString(),
             signatureType: replacement.signatureType.toString(),
-            sender: wallet.address,
+            sender: replacement.sender.toString(),
             side: replacement.side,
             assetId: replacement.assetId.toString(),
             epoch: replacement.epoch.toString(),
@@ -164,7 +176,7 @@ async function main() {
         replacementSignature,
     };
 
-    console.log("signedCancelReplaceMessage:", signedMessage);
+    console.log("signedAgentCancelReplaceMessage:", signedMessage);
     try {
         const res = await axios.post(CANCEL_REPLACE_ENDPOINT, signedMessage, {
             headers: {

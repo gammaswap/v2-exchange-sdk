@@ -79,6 +79,25 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "rm -rf dist",
+    "api:asset": "tsx scripts/api/getAsset.ts",
+    "api:balance": "tsx scripts/api/getBalance.ts",
+    "api:book": "tsx scripts/api/getBook.ts",
+    "api:book-orders": "tsx scripts/api/getBookOrders.ts",
+    "api:book-top": "tsx scripts/api/getBookTop.ts",
+    "api:order": "tsx scripts/api/sendTestOrder.ts",
+    "api:cancel": "tsx scripts/api/sendTestCancel.ts",
+    "api:cancel-replace": "tsx scripts/api/sendTestCancelReplace.ts",
+    "api:claim": "tsx scripts/api/sendTestClaim.ts",
+    "api:agent:approve": "tsx scripts/api/sendTestApproveAgent.ts",
+    "api:agent:revoke": "tsx scripts/api/sendTestRevokeAgent.ts",
+    "api:agent:status": "tsx scripts/api/getAgentApproval.ts",
+    "api:agent:order": "tsx scripts/api/sendTestAgentOrder.ts",
+    "api:agent:cancel": "tsx scripts/api/sendTestAgentCancel.ts",
+    "api:agent:cancel-replace": "tsx scripts/api/sendTestAgentCancelReplace.ts",
+    "api:agent:claim": "tsx scripts/api/sendTestAgentClaim.ts",
+    "api:deposit": "tsx scripts/api/sendTestDepositLedgerDeposit.ts",
+    "api:withdrawal": "tsx scripts/api/sendTestWithdrawal.ts",
+    "api:position": "tsx scripts/api/getPosition.ts",
     "prepublishOnly": "pnpm build"
   },
   "repository": {
@@ -104,6 +123,7 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
+    "tsx": "^4.20.3",
     "typescript-eslint": "^8.0.0",
     "typescript": "^5.9.3"
   }

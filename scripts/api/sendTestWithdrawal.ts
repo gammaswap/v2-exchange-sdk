@@ -1,11 +1,16 @@
 import 'dotenv/config';
 import { Wallet } from "ethers";
 import axios from "axios";
-import { validateSignatureJS, signOrderJS } from "../signing.js";
-import { hashWithdrawalOrderJS } from "../hashing.js";
-import { deriveAccountsFromMnemonic, getCurrentTime } from "../utils.js";
-import { Eip712Withdrawal } from "../types.js";
-import { OrderType, SignatureType } from "../constants.js";
+import {
+    validateSignatureJS,
+    signOrderJS,
+    hashWithdrawalOrderJS,
+    deriveAccountsFromMnemonic,
+    getCurrentTime,
+    Eip712Withdrawal,
+    OrderType,
+    SignatureType
+} from "@gammaswap/v2-exchange-sdk";
 
 const CHAIN_ID = process.env.CHAIN_ID || "31337";
 const LEDGER_ADDRESS = process.env.LEDGER_CONTRACT || "0x0000000000000000000000000000000000000000";

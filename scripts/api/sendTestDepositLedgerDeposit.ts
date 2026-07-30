@@ -1,10 +1,6 @@
 import "dotenv/config";
 import { ethers } from "ethers";
-import { createRequire } from "node:module";
-import { deriveAccountsFromMnemonic } from "../utils.js";
-
-const require = createRequire(import.meta.url);
-const { abi: DEPOSIT_LEDGER_ABI } = require("@gammaswap/v2-exchange/out/DepositLedger.sol/DepositLedger.json");
+import { deriveAccountsFromMnemonic, DEPOSIT_LEDGER_ABI } from "@gammaswap/v2-exchange-sdk";
 
 const RPC_URL = process.env.RPC_URL || "http://localhost:8545";
 const CHAIN_ID = process.env.CHAIN_ID || "31337";

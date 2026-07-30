@@ -1,15 +1,17 @@
 import 'dotenv/config';
 import { Wallet } from "ethers";
 import axios from "axios";
-import { validateSignatureJS, signOrderJS } from "../signing.js";
-import { hashRevokeAgentOrderJS } from "../hashing.js";
-import { deriveAccountsFromMnemonic } from "../utils.js";
-import { Eip712RevokeAgent } from "../types.js";
-import { OrderType, SignatureType } from "../constants.js";
+import {
+    validateSignatureJS,
+    signOrderJS,
+    hashRevokeAgentOrderJS,
+    deriveAccountsFromMnemonic,
+    Eip712RevokeAgent,
+    OrderType,
+    SignatureType
+} from "@gammaswap/v2-exchange-sdk";
 
 const CHAIN_ID = process.env.CHAIN_ID || "31337";
-const LEDGER_ADDRESS = process.env.LEDGER_CONTRACT || "0x0000000000000000000000000000000000000000";
-const SETTLEMENT_TOKEN_ADDRESS = process.env.SETTLEMENT_TOKEN || "0x0000000000000000000000000000000000000000";
 const MNEMONIC = process.env.TEST_MNEMONIC || "test test test test test test test test test test test junk";
 const AGENT_REVOKE_ENDPOINT = process.env.AGENT_REVOKE_ENDPOINT || "http://localhost:3000/agents/revoke";
 const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0");
@@ -18,8 +20,6 @@ const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0");
 // from root run with "pnpm --filter @v2-exchange/exchange-api agent:revoke"
 async function main() {
     console.log("CHAIN_ID:", CHAIN_ID);
-    console.log("LEDGER_ADDRESS:", LEDGER_ADDRESS);
-    console.log("SETTLEMENT_TOKEN_ADDRESS:", SETTLEMENT_TOKEN_ADDRESS);
     const account = deriveAccountsFromMnemonic(MNEMONIC, WALLET_INDEX + 1)[WALLET_INDEX];
     console.log("Using account address:", account.address);
 

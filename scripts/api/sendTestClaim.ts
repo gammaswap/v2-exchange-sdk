@@ -1,20 +1,20 @@
 import 'dotenv/config';
 import { Wallet } from "ethers";
 import axios from "axios";
-import { validateSignatureJS, signOrderJS } from "../signing.js";
-import { hashClaimOrderJS } from "../hashing.js";
-import { deriveAccountsFromMnemonic } from "../utils.js";
-import { Eip712Claim } from "../types.js";
-import { OrderType, SignatureType } from "../constants.js";
+import {
+    validateSignatureJS,
+    signOrderJS,
+    hashClaimOrderJS,
+    deriveAccountsFromMnemonic,
+    Eip712Claim,
+    OrderType,
+    SignatureType
+} from "@gammaswap/v2-exchange-sdk";
 
 const CHAIN_ID = process.env.CHAIN_ID || "31337";
-const LEDGER_ADDRESS = process.env.LEDGER_CONTRACT || "0x0000000000000000000000000000000000000000";
-const SETTLEMENT_TOKEN_ADDRESS = process.env.SETTLEMENT_TOKEN || "0x0000000000000000000000000000000000000000";
 const MNEMONIC = process.env.TEST_MNEMONIC || "test test test test test test test test test test test junk";
 const CLAIMS_ENDPOINT = process.env.CLAIMS_ENDPOINT || "http://localhost:3000/claim";
-const AGENT_STATUS_ENDPOINT = process.env.AGENT_STATUS_ENDPOINT || "http://localhost:3000/agents/status";
 const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0");
-const AGENT_INDEX = Number(process.env.AGENT_INDEX || "1");
 const ASSET_ID = process.env.ASSET_ID || "261336857817713630688382311349658711122006440411137";
 const EPOCH = process.env.EPOCH || "0";
 
@@ -22,12 +22,8 @@ const EPOCH = process.env.EPOCH || "0";
 // from root run with "pnpm --filter @v2-exchange/exchange-api claim <epoch>"
 async function main() {
     console.log("CHAIN_ID:", CHAIN_ID);
-    console.log("LEDGER_ADDRESS:", LEDGER_ADDRESS);
-    console.log("SETTLEMENT_TOKEN_ADDRESS:", SETTLEMENT_TOKEN_ADDRESS);
     const account = deriveAccountsFromMnemonic(MNEMONIC, WALLET_INDEX + 1)[WALLET_INDEX];
-    console.log("Using account address:", account.address);
-    const agent = deriveAccountsFromMnemonic(MNEMONIC, AGENT_INDEX + 1)[AGENT_INDEX];
-    console.log("Using agent address:", agent.address);
+    console.log("Using address:", account.address);
 
     let epoch = BigInt(EPOCH);
 
@@ -41,32 +37,15 @@ async function main() {
 
     console.log("epoch:", epoch)
 
-    let approvalNonce = 0n;
-    try {
-        const res = await axios.get(AGENT_STATUS_ENDPOINT + `/${account.address}`);
-        console.log("Server response:", res.status, res.data);
-        approvalNonce = BigInt(res.data.nonce);
-    } catch (err: any) {
-        if (err.response) {
-            console.error(
-                "Error response:",
-                err.response.status,
-                err.response.data
-            );
-        } else {
-            console.error("Request error:", err.message);
-        }
-    }
-
     const claim: Eip712Claim = {
         typ: OrderType.CLAIM,
         nonce: BigInt(Date.now()), // must be unique in every transaction the user sends
-        signer: agent.address,
-        signatureType: SignatureType.AGENT,
+        signer: account.address,
+        signatureType: SignatureType.EOA,
         sender: account.address,
         assetId: BigInt(ASSET_ID),
         epoch: epoch,
-        approvalNonce: approvalNonce,
+        approvalNonce: 0n,
     }
 
     const chainId = BigInt(CHAIN_ID)
@@ -74,7 +53,7 @@ async function main() {
     const claimHash = hashClaimOrderJS(claim);
     console.log("claimHash:", claimHash)
 
-    const wallet = new Wallet(agent.privateKey);
+    const wallet = new Wallet(account.privateKey);
 
     const signature = signOrderJS(claimHash, wallet)
     console.log("Signature:", signature);
@@ -87,9 +66,9 @@ async function main() {
         claim: {
             typ: claim.typ.toString(),
             nonce: claim.nonce.toString(), // must be unique in every transaction the user sends
-            signer: claim.signer.toString(),
+            signer: wallet.address,
             signatureType: claim.signatureType.toString(),
-            sender: claim.sender.toString(),
+            sender: wallet.address,
             assetId: claim.assetId.toString(),
             epoch: claim.epoch.toString(),
             approvalNonce: claim.approvalNonce.toString(),

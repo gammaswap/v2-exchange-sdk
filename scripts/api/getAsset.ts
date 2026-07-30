@@ -1,19 +1,16 @@
 import 'dotenv/config';
 import axios from "axios";
 
-const ASSET_ENDPOINT = process.env.BALANCE_ENDPOINT || "http://localhost:3000/asset";
-const ASSET_ID_TYPE2 = process.env.ASSET_ID_TYPE2 || "87112285931778509194580910505449742997580152833"
+const ASSET_ENDPOINT = process.env.ASSET_ENDPOINT || "http://localhost:3000/asset";
+const ASSET_ID = process.env.ASSET_ID || "261336857817713630688382311349658711122006440411137"
 
 // run with "npx ts-node ./src/getAsset.ts"
 async function main() {
 
-    let asset = "261336857817713630688382311349658711122006440411137"; // asset1
+    let asset = ASSET_ID;
     const args = process.argv.slice(2);
     if (args.length > 0) {
         asset = args[0]; // custom asset
-        if(asset == "2") {
-            asset = ASSET_ID_TYPE2; // asset2
-        }
     }
 
     try {

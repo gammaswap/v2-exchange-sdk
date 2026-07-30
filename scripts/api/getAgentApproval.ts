@@ -1,16 +1,14 @@
 import 'dotenv/config';
 import { ethers } from "ethers";
 import axios from "axios";
-import { deriveAccountsFromMnemonic } from "../utils.js";
+import { deriveAccountsFromMnemonic } from "@gammaswap/v2-exchange-sdk";
 
-const CHAIN_ID = process.env.CHAIN_ID || "31337";
 const MNEMONIC = process.env.TEST_MNEMONIC || "test test test test test test test test test test test junk";
 const AGENT_STATUS_ENDPOINT = process.env.AGENT_STATUS_ENDPOINT || "http://localhost:3000/agents/status";
 const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0")
 
 // run with "npx ts-node ./src/getBook.ts"
 async function main() {
-    console.log("CHAIN_ID:", CHAIN_ID);
     const account = deriveAccountsFromMnemonic(MNEMONIC, WALLET_INDEX + 1)[WALLET_INDEX];
 
     let _account = account.address;

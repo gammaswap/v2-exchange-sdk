@@ -25,6 +25,7 @@ import type {
   DepositPermitInput,
   DepositWithPermitInput,
 } from "./types.js";
+import { DEPOSIT_LEDGER_ABI, ERC20_ABI } from "./constants.js";
 
 export interface DepositClientOptions {
   rpcUrl: string;
@@ -59,29 +60,6 @@ const SETTLEMENT_TOKEN_DECIMALS = 6;
 const UINT256_MAX = 2n ** 256n - 1n;
 const DECIMAL_INTEGER_PATTERN = /^(0|[1-9][0-9]*)$/;
 const HEX_DATA_PATTERN = /^0x(?:[0-9a-fA-F]{2})*$/;
-
-const DEPOSIT_LEDGER_ABI = [
-  "event DepositQueued(uint256 indexed index,address indexed user,uint256 amount)",
-  "function SETTLEMENT_TOKEN() view returns (address)",
-  "function ACCOUNT_LEDGER() view returns (address)",
-  "function PERMIT2() view returns (address)",
-  "function pendingBalance() view returns (uint256)",
-  "function processedBalance() view returns (uint256)",
-  "function pendingDepositCount() view returns (uint128)",
-  "function nextPendingDepositId() view returns (uint128)",
-  "function processedDepositIndex() view returns (uint128)",
-  "function minBlockWait() view returns (uint256)",
-  "function canProcessNext() view returns (bool)",
-  "function deposit(uint256 amount)",
-  "function depositWithPermit(uint256 amount,uint256 nonce,address owner,uint256 deadline,bytes signature)",
-] as const;
-
-const ERC20_ABI = [
-  "function approve(address spender,uint256 amount) returns (bool)",
-  "function allowance(address owner,address spender) view returns (uint256)",
-  "function balanceOf(address owner) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-] as const;
 
 const PERMIT2_TYPES: Record<string, TypedDataField[]> = {
   TokenPermissions: [
