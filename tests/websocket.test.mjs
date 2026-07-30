@@ -18,6 +18,7 @@ class FakeWebSocket {
   readyState = 0;
   sent = [];
   listeners = new Map();
+  terminated = false;
 
   constructor(url) {
     this.url = url;
@@ -52,6 +53,11 @@ class FakeWebSocket {
   close(code = 1000, reason = "") {
     this.readyState = 3;
     this.emit("close", { code, reason });
+  }
+
+  terminate() {
+    this.terminated = true;
+    this.readyState = 3;
   }
 
   open() {
@@ -271,6 +277,7 @@ test("ExchangeWebSocketClient treats unsubscribe acknowledgement timeouts as bes
   assert.match(errors[0].message, /Timed out waiting for unsubscribe acknowledgement/);
   assert.equal(client.connectionState, "closed");
   assert.equal(FakeWebSocket.instances.length, 1);
+  assert.equal(socket.terminated, true);
 });
 
 test("ExchangeWebSocketClient reconnects remaining subscriptions after unsubscribe acknowledgement timeout", async () => {

@@ -14,6 +14,7 @@ export interface WebSocketLike {
   readonly readyState: number;
   send(data: string): void;
   close(code?: number, reason?: string): void;
+  terminate?(): void;
   addEventListener?(event: string, listener: (event: unknown) => void): void;
   removeEventListener?(event: string, listener: (event: unknown) => void): void;
   on?(event: string, listener: (...args: unknown[]) => void): void;
@@ -482,12 +483,24 @@ export class ExchangeWebSocketClient {
       this.state = "closed";
     }
 
-    if (socket !== undefined && (socket.readyState === CONNECTING || socket.readyState === OPEN)) {
-      try {
+    if (socket !== undefined) {
+      this.closeFailedSocket(socket);
+    }
+  }
+
+  private closeFailedSocket(socket: WebSocketLike): void {
+    if (socket.readyState !== CONNECTING && socket.readyState !== OPEN) {
+      return;
+    }
+
+    try {
+      if (socket.terminate !== undefined) {
+        socket.terminate();
+      } else {
         socket.close();
-      } catch (closeError) {
-        this.emitError(closeError);
       }
+    } catch (closeError) {
+      this.emitError(closeError);
     }
   }
 
