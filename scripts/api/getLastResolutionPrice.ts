@@ -4,21 +4,17 @@ import axios from "axios";
 const RESOLUTION_ENDPOINT = process.env.RESOLUTION_ENDPOINT || "http://localhost:3000/resolve";
 const ASSET_ID = process.env.ASSET_ID || "261336857817713630688382311349658711122006440411137"
 
-// run with "npx ts-node ./src/getResolutionPrice.ts"
+// run with "npx ts-node ./src/getLastResolutionPrice.ts"
 async function main() {
 
     let asset = ASSET_ID;
-    let epoch = 0;
     const args = process.argv.slice(2);
     if (args.length > 0) {
-        epoch = Number(args[0]); // custom epoch
-    }
-    if (args.length > 1) {
-        asset = args[1]; // custom asset
+        asset = args[0]; // custom asset
     }
 
     try {
-        const res = await axios.get(RESOLUTION_ENDPOINT + `/${asset}/${epoch}`);
+        const res = await axios.get(RESOLUTION_ENDPOINT + `/last/epoch/${asset}`);
         console.log("Server response:", res.status, res.data);
     } catch (err: any) {
         if (err.response) {
