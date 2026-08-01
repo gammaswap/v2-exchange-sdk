@@ -110,6 +110,7 @@
     "api:deposit": "tsx scripts/api/sendTestDepositLedgerDeposit.ts",
     "api:withdrawal": "tsx scripts/api/sendTestWithdrawal.ts",
     "api:position": "tsx scripts/api/getPosition.ts",
+    "api:resolution": "tsx scripts/api/getResolutionPrice.ts",
     "api:ws:book": "tsx scripts/api/wsBookTest.ts",
     "api:ws:oracle": "tsx scripts/api/wsOracleTest.ts",
     "sample:asset": "tsx scripts/sample/getAsset.ts",
