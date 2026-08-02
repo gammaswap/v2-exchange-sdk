@@ -64,7 +64,7 @@ case-insensitive address comparison.
 
 ```ts
 const info = createInfoClient({
-  apiUrl: "http://localhost:3000",
+  apiUrl: "https://exchange-api.gammaswap.com",
 });
 ```
 
@@ -95,6 +95,13 @@ const info = createInfoClient({
 - `apiUrl` is normalized with a trailing slash internally.
 - `getExchangeConfig()` fetches configured contract addresses from the API, but
   the SDK also has hard-coded defaults for supported chain IDs.
+- `getResolutionPrice({ assetId, epoch })` fetches the resolution price for a
+  specific asset and epoch from `/resolve/:assetId/:epoch`. It requires an input
+  object because it has two fields, matching the multi-field request style used
+  by `getOrderBook()`, `getBookOrders()`, `getTopOfBook()`, and `getPosition()`.
+- `getLastResolutionPrice(inputOrAssetId)` fetches the latest resolution price
+  for an asset from `/resolve/last/epoch/:assetId`. Like other single-field
+  read calls, it accepts either `{ assetId }` or the asset ID directly.
 
 ## ExchangeClient
 
@@ -105,9 +112,9 @@ signed payloads to the exchange API.
 import { Wallet } from "ethers";
 
 const exchange = createExchangeClient({
-  apiUrl: "http://localhost:3000",
+  apiUrl: "https://exchange-api.gammaswap.com",
   wallet: new Wallet(process.env.PRIVATE_KEY!),
-  chainId: "31337",
+  chainId: "84532",
 });
 ```
 
@@ -167,9 +174,9 @@ flows.
 import { Wallet } from "ethers";
 
 const deposit = createDepositClient({
-  rpcUrl: "http://127.0.0.1:8545",
-  wallet: new Wallet(process.env.PRIVATE_KEY!),
-  chainId: "31337",
+    rpcUrl: `BASE_SEPOLIA_RPC_URL`,
+    wallet: new Wallet(process.env.PRIVATE_KEY!),
+    chainId: "84532",
 });
 ```
 
@@ -223,12 +230,12 @@ const deposit = createDepositClient({
 
 ```ts
 const ws = createExchangeWebSocketClient({
-  websocketUrl: "ws://127.0.0.1:4000",
+  websocketUrl: "wss://exchange-api.gammaswap.com",
   onError: (error) => console.error(error),
 });
 
 const unsubscribe = await ws.subscribeOrderBook(
-  "261336857817713630688382311349658711122006440411137",
+  "ASSET_ID",
   {
     onUpdate: (update) => console.log(update),
     onResyncRequired: (assetId) => {
@@ -301,7 +308,7 @@ ws.close();
 
 ```ts
 const oracle = createOracleWebSocketClient({
-  websocketUrl: "ws://127.0.0.1:8082",
+  websocketUrl: "wss://exchange-api.gammaswap.com",
   stalePriceTimeoutMs: 30_000,
   onError: (error) => console.error(error),
 });
@@ -374,7 +381,12 @@ Common commands:
 
 ```sh
 pnpm sample:asset
+pnpm sample:balance
 pnpm sample:book
+pnpm sample:book-orders
+pnpm sample:book-top
+pnpm sample:resolution
+pnpm sample:last-resolution
 pnpm sample:order
 pnpm sample:cancel
 pnpm sample:cancel-replace
