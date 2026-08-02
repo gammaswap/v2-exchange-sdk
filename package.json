@@ -121,6 +121,8 @@
     "sample:book-top": "tsx scripts/sample/getBookTop.ts",
     "sample:position": "tsx scripts/sample/getPosition.ts",
     "sample:order": "tsx scripts/sample/sendTestOrder.ts",
+    "sample:resolution": "tsx scripts/sample/getResolutionPrice.ts",
+    "sample:last-resolution": "tsx scripts/sample/getLastResolutionPrice.ts",
     "sample:cancel": "tsx scripts/sample/sendTestCancel.ts",
     "sample:cancel-replace": "tsx scripts/sample/sendTestCancelReplace.ts",
     "sample:claim": "tsx scripts/sample/sendTestClaim.ts",
