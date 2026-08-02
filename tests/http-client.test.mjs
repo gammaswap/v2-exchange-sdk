@@ -179,6 +179,8 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
   });
 
   await client.getAsset("1");
+  await client.getResolutionPrice({ assetId: "2", epoch: "3" });
+  await client.getLastResolutionPrice("2");
   await client.getBalance(MASTER);
   await client.getOrderBook({ assetId: "2", epoch: "3" });
   await client.getBookOrders({ assetId: "2", epoch: "3", account: MASTER });
@@ -193,6 +195,8 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
     mock.calls.map((call) => call.url),
     [
       "http://localhost:3000/api/asset/1",
+      "http://localhost:3000/api/resolve/2/3",
+      "http://localhost:3000/api/resolve/last/epoch/2",
       `http://localhost:3000/api/balance/${MASTER}`,
       "http://localhost:3000/api/book/2/3",
       `http://localhost:3000/api/book/2/3/${MASTER}`,

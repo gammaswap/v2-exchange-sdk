@@ -47,8 +47,10 @@ import {
   getBalanceRequestSchema,
   getBookOrdersRequestSchema,
   getExchangeConfigRequestSchema,
+  getLastResolutionPriceRequestSchema,
   getOrderBookRequestSchema,
   getPositionRequestSchema,
+  getResolutionPriceRequestSchema,
   getTopOfBookRequestSchema,
   parseExchangeChainConfig,
   parseExchangeContracts,
@@ -67,8 +69,10 @@ import type {
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
+  GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetResolutionPriceRequest,
   GetTopOfBookRequest,
   JsonExchangeChainConfig,
   JsonSignedApproveAgentMessage,
@@ -174,6 +178,22 @@ export class InfoClient {
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
     return this.get(`/asset/${encodePathSegment(request.assetId)}`);
+  }
+
+  async getResolutionPrice(input: ProtocolInput<GetResolutionPriceRequest>): Promise<HttpResult> {
+    const request = getResolutionPriceRequestSchema.parse(input);
+    return this.get(
+      `/resolve/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+    );
+  }
+
+  async getLastResolutionPrice(
+    input: ProtocolInput<GetLastResolutionPriceRequest> | ProtocolBigNumberish,
+  ): Promise<HttpResult> {
+    const request = getLastResolutionPriceRequestSchema.parse(
+      typeof input === "object" && input !== null ? input : { assetId: input },
+    );
+    return this.get(`/resolve/last/epoch/${encodePathSegment(request.assetId)}`);
   }
 
   async getBalance(input: ProtocolInput<GetBalanceRequest> | Address): Promise<HttpResult> {

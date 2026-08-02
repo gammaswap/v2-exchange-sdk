@@ -78,6 +78,8 @@ const info = createInfoClient({
 ### Available functions:
 
 - `getAsset(inputOrAssetId)`
+- `getResolutionPrice(input)`
+- `getLastResolutionPrice(inputOrAssetId)`
 - `getBalance(inputOrAccount)`
 - `getOrderBook(input)`
 - `getBookOrders(input)`

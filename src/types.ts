@@ -409,6 +409,15 @@ export interface GetAssetRequest {
   assetId: bigint;
 }
 
+export interface GetResolutionPriceRequest {
+  assetId: bigint;
+  epoch: bigint;
+}
+
+export interface GetLastResolutionPriceRequest {
+  assetId: bigint;
+}
+
 export interface GetBalanceRequest {
   account: Address;
 }

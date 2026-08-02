@@ -32,8 +32,10 @@ import type {
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
+  GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetResolutionPriceRequest,
   GetTopOfBookRequest,
   OraclePriceUpdate,
   OracleWebSocketControlMessage,
@@ -586,6 +588,15 @@ export const signedInvalidateMessageSchema = objectSchema<SignedInvalidateMessag
 });
 
 export const getAssetRequestSchema = objectSchema<GetAssetRequest>({
+  assetId: uint256,
+});
+
+export const getResolutionPriceRequestSchema = objectSchema<GetResolutionPriceRequest>({
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const getLastResolutionPriceRequestSchema = objectSchema<GetLastResolutionPriceRequest>({
   assetId: uint256,
 });
 

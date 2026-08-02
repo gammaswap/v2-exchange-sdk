@@ -519,6 +519,13 @@ test("signed message schemas reject incomplete wrappers", () => {
 
 test("unsigned request schemas parse examples from the request surface", () => {
   assert.deepEqual(schemas.getAssetRequestSchema.parse({ assetId: "1" }), { assetId: 1n });
+  assert.deepEqual(schemas.getResolutionPriceRequestSchema.parse({ assetId: "1", epoch: "2" }), {
+    assetId: 1n,
+    epoch: 2n,
+  });
+  assert.deepEqual(schemas.getLastResolutionPriceRequestSchema.parse({ assetId: "1" }), {
+    assetId: 1n,
+  });
   assert.deepEqual(schemas.getBalanceRequestSchema.parse({ account: ACCOUNT }), {
     account: ACCOUNT,
   });
