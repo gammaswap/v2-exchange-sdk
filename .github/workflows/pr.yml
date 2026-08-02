@@ -1,0 +1,22 @@
+name: Compile/Test
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  compile-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com/
+          scope: '@gammaswap'
+
+      - run: pnpm install
+      - name: Run build
+        run: pnpm run build
+      - run: pnpm run test

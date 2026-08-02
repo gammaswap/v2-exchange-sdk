@@ -143,6 +143,9 @@
     "type": "git",
     "url": "git+ssh://git@github.com/gammaswap/v2-exchange-sdk.git"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/@gammaswap"
+  },
   "bugs": {
     "url": "https://github.com/gammaswap/v2-exchange-sdk/issues"
   },
@@ -151,6 +154,7 @@
     "node": ">=20",
     "pnpm": ">=10"
   },
+  "author": "Daniel D. Alcarraz (https://github.com/0xDanr)",
   "sideEffects": false,
   "dependencies": {
     "ethers": "^6.15.0",
