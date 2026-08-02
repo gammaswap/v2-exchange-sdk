@@ -5,22 +5,29 @@ on:
     branches:
       - "**"
 
+permissions:
+  contents: read
+
 jobs:
   compile-test:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v4.4.0
+
+      - uses: actions/setup-node@v6
         with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
+          node-version: 24
+          cache: "pnpm"
           registry-url: https://npm.pkg.github.com/
-          scope: '@gammaswap'
-      - run: pnpm install
+          scope: "@gammaswap"
+
+      - run: pnpm install --frozen-lockfile
+
       - name: Run build
         run: pnpm run build
+
       - run: pnpm run test

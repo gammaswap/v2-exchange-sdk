@@ -151,7 +151,8 @@
   },
   "homepage": "https://github.com/gammaswap/v2-exchange-sdk#readme",
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=10"
   },
   "author": "Daniel D. Alcarraz (https://github.com/0xDanr)",
   "sideEffects": false,
