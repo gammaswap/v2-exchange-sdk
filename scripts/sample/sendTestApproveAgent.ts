@@ -11,6 +11,7 @@ const MNEMONIC =
     process.env.TEST_MNEMONIC ||
     "test test test test test test test test test test test junk";
 const WALLET_INDEX = Number(process.env.WALLET_INDEX || "0");
+const AGENT_INDEX = Number(process.env.AGENT_INDEX || "1");
 
 async function main() {
     console.log("CHAIN_ID:", CHAIN_ID);
@@ -18,7 +19,7 @@ async function main() {
     const account = deriveAccountsFromMnemonic(MNEMONIC, WALLET_INDEX + 1)[WALLET_INDEX];
     console.log("Using account address:", account.address);
 
-    let agentIndex = WALLET_INDEX + 1;
+    let agentIndex = AGENT_INDEX;
     if (process.argv.length > 2) {
         if (isNaN(Number(process.argv[2]))) {
             console.log("Invalid agent index provided");
