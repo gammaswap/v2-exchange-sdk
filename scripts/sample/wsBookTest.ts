@@ -11,12 +11,14 @@ const WS_SERVICE_URL =
     process.env.WS_SERVICE_URL ??
     `ws://127.0.0.1:${process.env.WS_SERVICE_PORT ?? "4000"}`;
 
-// run with "pnpm sample:ws"
-// or "pnpm sample:ws <assetId>"
+// run with "pnpm sample:ws:book"
+// or "pnpm sample:ws:book <assetId>"
 async function main() {
     const args = process.argv.slice(2);
     const assetId = args[0] || ASSET_ID;
 
+    console.log("WS_SERVICE_URL:", WS_SERVICE_URL);
+    console.log("ASSET_ID:", ASSET_ID);
     const client = createExchangeWebSocketClient({
         websocketUrl: WS_SERVICE_URL,
         onError: (error) => {

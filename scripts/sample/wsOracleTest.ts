@@ -7,13 +7,14 @@ const ORACLE_FEED_WS_URL =
     `ws://127.0.0.1:${process.env.ORACLE_FEED_WS_PORT ?? "8082"}`;
 
 // run with something like:
-// pnpm sample:oracle-ws
-// or
-// pnpm sample:oracle-ws <symbolId>
+// pnpm sample:ws:oracle
+// or pnpm sample:ws:oracle <symbolId>
 async function main() {
     const args = process.argv.slice(2);
     const symbolId = args[0] || SYMBOL_ID;
 
+    console.log("ORACLE_FEED_WS_URL:", ORACLE_FEED_WS_URL);
+    console.log("SYMBOL_ID:", SYMBOL_ID);
     const client = createOracleWebSocketClient({
         websocketUrl: ORACLE_FEED_WS_URL,
         onError: (error) => {
