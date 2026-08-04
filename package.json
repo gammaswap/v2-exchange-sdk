@@ -1,0 +1,174 @@
+{
+  "name": "@gammaswap/v2-exchange-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the GammaSwap v2 exchange.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.11.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./builders": {
+      "types": "./dist/builders.d.ts",
+      "import": "./dist/builders.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.d.ts",
+      "import": "./dist/constants.js"
+    },
+    "./decimal-inputs": {
+      "types": "./dist/decimal-inputs.d.ts",
+      "import": "./dist/decimal-inputs.js"
+    },
+    "./deposit-client": {
+      "types": "./dist/deposit-client.d.ts",
+      "import": "./dist/deposit-client.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./hashing": {
+      "types": "./dist/hashing.d.ts",
+      "import": "./dist/hashing.js"
+    },
+    "./integer-inputs": {
+      "types": "./dist/integer-inputs.d.ts",
+      "import": "./dist/integer-inputs.js"
+    },
+    "./string-inputs": {
+      "types": "./dist/string-inputs.d.ts",
+      "import": "./dist/string-inputs.js"
+    },
+    "./oracle-websocket": {
+      "types": "./dist/oracle-websocket.d.ts",
+      "import": "./dist/oracle-websocket.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas.d.ts",
+      "import": "./dist/schemas.js"
+    },
+    "./signing": {
+      "types": "./dist/signing.d.ts",
+      "import": "./dist/signing.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./websocket": {
+      "types": "./dist/websocket.d.ts",
+      "import": "./dist/websocket.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm build && node --test tests/*.test.mjs",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf dist",
+    "api:asset": "tsx scripts/api/getAsset.ts",
+    "api:balance": "tsx scripts/api/getBalance.ts",
+    "api:book": "tsx scripts/api/getBook.ts",
+    "api:book-orders": "tsx scripts/api/getBookOrders.ts",
+    "api:book-top": "tsx scripts/api/getBookTop.ts",
+    "api:order": "tsx scripts/api/sendTestOrder.ts",
+    "api:cancel": "tsx scripts/api/sendTestCancel.ts",
+    "api:cancel-replace": "tsx scripts/api/sendTestCancelReplace.ts",
+    "api:claim": "tsx scripts/api/sendTestClaim.ts",
+    "api:agent:approve": "tsx scripts/api/sendTestApproveAgent.ts",
+    "api:agent:revoke": "tsx scripts/api/sendTestRevokeAgent.ts",
+    "api:agent:status": "tsx scripts/api/getAgentApproval.ts",
+    "api:agent:order": "tsx scripts/api/sendTestAgentOrder.ts",
+    "api:agent:cancel": "tsx scripts/api/sendTestAgentCancel.ts",
+    "api:agent:cancel-replace": "tsx scripts/api/sendTestAgentCancelReplace.ts",
+    "api:agent:claim": "tsx scripts/api/sendTestAgentClaim.ts",
+    "api:deposit": "tsx scripts/api/sendTestDepositLedgerDeposit.ts",
+    "api:withdrawal": "tsx scripts/api/sendTestWithdrawal.ts",
+    "api:position": "tsx scripts/api/getPosition.ts",
+    "api:resolution": "tsx scripts/api/getResolutionPrice.ts",
+    "api:last-resolution": "tsx scripts/api/getLastResolutionPrice.ts",
+    "api:ws:book": "tsx scripts/api/wsBookTest.ts",
+    "api:ws:oracle": "tsx scripts/api/wsOracleTest.ts",
+    "sample:asset": "tsx scripts/sample/getAsset.ts",
+    "sample:balance": "tsx scripts/sample/getBalance.ts",
+    "sample:book": "tsx scripts/sample/getBook.ts",
+    "sample:book-orders": "tsx scripts/sample/getBookOrders.ts",
+    "sample:book-top": "tsx scripts/sample/getBookTop.ts",
+    "sample:position": "tsx scripts/sample/getPosition.ts",
+    "sample:resolution": "tsx scripts/sample/getResolutionPrice.ts",
+    "sample:last-resolution": "tsx scripts/sample/getLastResolutionPrice.ts",
+    "sample:order": "tsx scripts/sample/sendTestOrder.ts",
+    "sample:cancel": "tsx scripts/sample/sendTestCancel.ts",
+    "sample:cancel-replace": "tsx scripts/sample/sendTestCancelReplace.ts",
+    "sample:claim": "tsx scripts/sample/sendTestClaim.ts",
+    "sample:deposit": "tsx scripts/sample/sendTestDepositLedgerDeposit.ts",
+    "sample:withdrawal": "tsx scripts/sample/sendTestWithdrawal.ts",
+    "sample:agent:approve": "tsx scripts/sample/sendTestApproveAgent.ts",
+    "sample:agent:revoke": "tsx scripts/sample/sendTestRevokeAgent.ts",
+    "sample:agent:status": "tsx scripts/sample/getAgentApproval.ts",
+    "sample:agent:order": "tsx scripts/sample/sendTestAgentOrder.ts",
+    "sample:agent:cancel": "tsx scripts/sample/sendTestAgentCancel.ts",
+    "sample:agent:cancel-replace": "tsx scripts/sample/sendTestAgentCancelReplace.ts",
+    "sample:agent:claim": "tsx scripts/sample/sendTestAgentClaim.ts",
+    "sample:ws:book": "tsx scripts/sample/wsBookTest.ts",
+    "sample:ws:oracle": "tsx scripts/sample/wsOracleTest.ts",
+    "prepublishOnly": "pnpm build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/gammaswap/v2-exchange-sdk.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/@gammaswap"
+  },
+  "bugs": {
+    "url": "https://github.com/gammaswap/v2-exchange-sdk/issues"
+  },
+  "homepage": "https://github.com/gammaswap/v2-exchange-sdk#readme",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "author": "Daniel D. Alcarraz (https://github.com/0xDanr)",
+  "sideEffects": false,
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^24.10.1",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.20.3",
+    "typescript-eslint": "^8.0.0",
+    "typescript": "^5.9.3"
+  }
+}
