@@ -1,8 +1,8 @@
 # Exchange API Reference
 
-This package exposes the HTTP API implemented in `src/routes`. Routes are mounted
-directly on the local Express app, so the local server has no extra `/api` prefix.
-Production is served behind the `/api` base path shown below.
+This document describes the Exchange HTTP API. Local deployments are usually
+served without an `/api` prefix. Production is served behind the `/api` base path
+shown below.
 
 Default local base URL:
 
@@ -25,29 +25,29 @@ https://exchange-api.gammaswap.com/api
 - `side` is a boolean order direction: `false` means buy, `true` means sell.
 - `timeInForce` can be passed as a string or number-like value and is normalized to:
 
-| Value | Name | Meaning |
-| --- | --- | --- |
-| `0` | `GTC` | Good until cancelled. |
-| `1` | `FOK` | Fill or kill. |
-| `2` | `IOC` | Immediate or cancel. |
-| `3` | `ALO` | Add liquidity only. |
+| Value | Name  | Meaning               |
+| ----- | ----- | --------------------- |
+| `0`   | `GTC` | Good until cancelled. |
+| `1`   | `FOK` | Fill or kill.         |
+| `2`   | `IOC` | Immediate or cancel.  |
+| `3`   | `ALO` | Add liquidity only.   |
 
-- `signatureType` values used by this package are:
+- `signatureType` values used by this API are:
 
-| Value | Name | Meaning |
-| --- | --- | --- |
-| `0` | `EOA` | The sender signs directly. |
-| `4` | `AGENT` | An approved agent signs for the sender. |
+| Value | Name    | Meaning                                 |
+| ----- | ------- | --------------------------------------- |
+| `0`   | `EOA`   | The sender signs directly.              |
+| `4`   | `AGENT` | An approved agent signs for the sender. |
 
-### Signed Message Hashing
+### Authentication
 
-Signed POST endpoints use the same EIP-712 signing flow. The request contains one action object, such as `order`, `cancel`, `withdrawal`, `claim`, `resolution`, `approval`, `revocation`, `pause`, or `invalidate`, plus an `orderHash` and `signature`.
+Signed POST endpoints use the same EIP-712 signing flow. Most requests contain one action object, such as `order`, `cancel`, `withdrawal`, `claim`, `approval`, or `revocation`, plus an `orderHash` and `signature`. `POST /cancel-replace` includes a signed `cancelReplace` action and a separately signed `replacement` order.
 
 The field name `orderHash` is historical: for every signed endpoint it means "the EIP-712 digest of the signed action object." It is not a hash of the outer HTTP request body, and it does not include `signature`.
 
-The SDK computes signed action hashes in three steps:
+Clients compute signed action hashes in three steps:
 
-1. Build or parse the action object using the SDK schema so numeric fields are represented as `bigint`.
+1. Build or parse the action object so numeric fields are represented as exact integers.
 2. Compute the action-specific struct hash with the action type hash and ABI-encoded fields in canonical order.
 3. Compute the final EIP-712 digest:
 
@@ -64,38 +64,32 @@ chainId: request chainId
 verifyingContract: exchange verifying contract
 ```
 
-The client signs that digest directly and sends the original action object, `chainId`, `orderHash`, and `signature`. The server recomputes the same digest from the submitted action object and domain, recovers the signer from `signature`, and compares it with the action's `signer`.
+The client signs that digest directly and sends the original action object, `chainId`, `orderHash`, and `signature`. The API recomputes the same digest from the submitted action object and domain, recovers the signer from `signature`, and compares it with the action's `signer`.
 
 This works because the digest commits to the exact action type, field names, field order, Solidity integer widths, addresses, chain id, and verifying contract. Changing any signed field changes the digest and invalidates the signature. The domain prevents replaying the same signed action against a different chain or verifying contract.
 
-Use the action-specific SDK hash helper:
+The `@gammaswap/v2-exchange-sdk` package exposes hash and signing helpers that can be used to construct direct API request bodies:
 
-| Action object | Endpoint | Hash helper |
-| --- | --- | --- |
-| `order` | `POST /orders` | `hashFillOrderJS` |
-| `cancel` | `POST /cancels` | `hashCancelOrderJS` |
+| Action object   | Endpoint               | Hash helper                |
+| --------------- | ---------------------- | -------------------------- |
+| `order`         | `POST /orders`         | `hashFillOrderJS`          |
+| `cancel`        | `POST /cancels`        | `hashCancelOrderJS`        |
 | `cancelReplace` | `POST /cancel-replace` | `hashCancelReplaceOrderJS` |
-| `replacement` | `POST /cancel-replace` | `hashFillOrderJS` |
-| `withdrawal` | `POST /withdrawals` | `hashWithdrawalOrderJS` |
-| `claim` | `POST /claim` | `hashClaimOrderJS` |
-| `resolution` | `POST /resolve` | `hashResolutionOrderJS` |
-| `approval` | `POST /agents/approve` | `hashApproveAgentOrderJS` |
-| `revocation` | `POST /agents/revoke` | `hashRevokeAgentOrderJS` |
-| `pause` | `POST /admin/pause` | `hashPauseOrderJS` |
-| `invalidate` | `POST /admin/invalidate` | `hashInvalidateOrderJS` |
+| `replacement`   | `POST /cancel-replace` | `hashFillOrderJS`          |
+| `withdrawal`    | `POST /withdrawals`    | `hashWithdrawalOrderJS`    |
+| `claim`         | `POST /claim`          | `hashClaimOrderJS`         |
+| `approval`      | `POST /agents/approve` | `hashApproveAgentOrderJS`  |
+| `revocation`    | `POST /agents/revoke`  | `hashRevokeAgentOrderJS`   |
+
+`POST /agents/approve` also includes `approval.approvalSignature`, which is a signature over the inner agent approval hash. The helper for that inner hash is `hashAgentApprovalJS`.
 
 Example for `POST /orders`:
 
 ```ts
-import {
-  buildOrder,
-  buildSignedOrderMessageJson,
-  getExchangeDomain,
-  hashFillOrderJS,
-  signOrderJS,
-} from "@gammaswap/v2-exchange-sdk";
+import { getExchangeDomain, hashFillOrderJS, signOrderJS } from "@gammaswap/v2-exchange-sdk";
 
-const order = buildOrder({
+const order = {
+  typ: 2n,
   nonce,
   signer: wallet.address,
   signatureType: 0n,
@@ -107,150 +101,160 @@ const order = buildOrder({
   price,
   timeInForce: 0n,
   approvalNonce: 0n,
-});
+};
 
 const domain = getExchangeDomain(chainId, verifyingContract);
 const orderHash = hashFillOrderJS(order, domain);
 const signature = signOrderJS(orderHash, wallet);
 
-const body = buildSignedOrderMessageJson({
-  order,
-  chainId,
+const body = {
+  order: {
+    typ: order.typ.toString(),
+    nonce: order.nonce.toString(),
+    signer: order.signer,
+    signatureType: order.signatureType.toString(),
+    sender: order.sender,
+    epoch: order.epoch.toString(),
+    side: order.side,
+    assetId: order.assetId.toString(),
+    size: order.size.toString(),
+    price: order.price.toString(),
+    timeInForce: order.timeInForce.toString(),
+    approvalNonce: order.approvalNonce.toString(),
+  },
+  chainId: chainId.toString(),
   orderHash,
   signature,
-});
+};
 ```
 
 For `POST /cancel-replace`, the replacement order is signed separately with `hashFillOrderJS(replacement, domain)`, and the cancel-replace action signs the resulting `replacementOrderHash` with `hashCancelReplaceOrderJS(cancelReplace, domain)`.
 
-## Local Test Scripts
+## Local API Scripts
 
-The package scripts in `package.json` exercise these endpoints:
+The package scripts below exercise direct API requests from `scripts/api`:
 
-| Script | Endpoint |
-| --- | --- |
-| `pnpm --filter @v2-exchange/exchange-api dev` | Starts the API server. |
-| `pnpm --filter @v2-exchange/exchange-api asset` | `GET /asset/:assetId` |
-| `pnpm --filter @v2-exchange/exchange-api balance` | `GET /balance/:account` |
-| `pnpm --filter @v2-exchange/exchange-api book` | `GET /book/:assetId/:epoch` |
-| `pnpm --filter @v2-exchange/exchange-api book-top` | `GET /book/market/top/:assetId/:epoch` |
-| `pnpm --filter @v2-exchange/exchange-api book-orders` | `GET /book/:assetId/:epoch/:account` |
-| `pnpm --filter @v2-exchange/exchange-api order` | `POST /orders` |
-| `pnpm --filter @v2-exchange/exchange-api cancel` | `POST /cancels` |
-| `pnpm --filter @v2-exchange/exchange-api cancel-replace` | `POST /cancel-replace` |
-| `pnpm --filter @v2-exchange/exchange-api claim` | `POST /claim` |
-| `pnpm --filter @v2-exchange/exchange-api withdrawal` | `POST /withdrawals` |
-| `pnpm --filter @v2-exchange/exchange-api position` | `GET /position/:account/:assetId/:epoch` |
-| `pnpm --filter @v2-exchange/exchange-api resolve` | `POST /resolve` |
-| `pnpm --filter @v2-exchange/exchange-api agent:approve` | `POST /agents/approve` |
-| `pnpm --filter @v2-exchange/exchange-api agent:revoke` | `POST /agents/revoke` |
-| `pnpm --filter @v2-exchange/exchange-api agent:status` | `GET /agents/status/:master` |
-| `pnpm --filter @v2-exchange/exchange-api agent:order` | `POST /orders` with `signatureType = 4` |
-| `pnpm --filter @v2-exchange/exchange-api agent:cancel` | `POST /cancels` with `signatureType = 4` |
-| `pnpm --filter @v2-exchange/exchange-api agent:cancel-replace` | `POST /cancel-replace` with `signatureType = 4` |
-| `pnpm --filter @v2-exchange/exchange-api agent:claim` | `POST /claim` with `signatureType = 4` |
+| Script                          | Endpoint                                        |
+| ------------------------------- | ----------------------------------------------- |
+| `pnpm api:asset`                | `GET /asset/:assetId`                           |
+| `pnpm api:balance`              | `GET /balance/:account`                         |
+| `pnpm api:book`                 | `GET /book/:assetId/:epoch`                     |
+| `pnpm api:book-orders`          | `GET /book/:assetId/:epoch/:account`            |
+| `pnpm api:book-top`             | `GET /book/market/top/:assetId/:epoch`          |
+| `pnpm api:position`             | `GET /position/:account/:assetId/:epoch`        |
+| `pnpm api:resolution`           | `GET /resolve/:assetId/:epoch`                  |
+| `pnpm api:last-resolution`      | `GET /resolve/last/epoch/:assetId`              |
+| `pnpm api:agent:status`         | `GET /agents/status/:master`                    |
+| `pnpm api:order`                | `POST /orders`                                  |
+| `pnpm api:cancel`               | `POST /cancels`                                 |
+| `pnpm api:cancel-replace`       | `POST /cancel-replace`                          |
+| `pnpm api:claim`                | `POST /claim`                                   |
+| `pnpm api:withdrawal`           | `POST /withdrawals`                             |
+| `pnpm api:agent:approve`        | `POST /agents/approve`                          |
+| `pnpm api:agent:revoke`         | `POST /agents/revoke`                           |
+| `pnpm api:agent:order`          | `POST /orders` with `signatureType = 4`         |
+| `pnpm api:agent:cancel`         | `POST /cancels` with `signatureType = 4`        |
+| `pnpm api:agent:cancel-replace` | `POST /cancel-replace` with `signatureType = 4` |
+| `pnpm api:agent:claim`          | `POST /claim` with `signatureType = 4`          |
 
-The `deposit`, `permit2`, `approve-permit2`, and `check-allowance` scripts call contracts directly and do not submit HTTP requests to this API.
+`pnpm api:deposit` calls the DepositLedger contract directly and is not an HTTP API endpoint. `pnpm api:ws:book` and `pnpm api:ws:oracle` connect to WebSocket services rather than HTTP endpoints.
 
-## Shared Models
+## Models
 
 ### Signed Request Wrapper
 
 Most POST endpoints use this outer JSON shape:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `chainId` | string | Chain id used by the signing script. Agent routes require it to be present. |
-| `orderHash` | string | EIP-712 hash of the signed action object. |
-| `signature` | string | Signature over `orderHash`. |
+| Field       | Type   | Description                                                        |
+| ----------- | ------ | ------------------------------------------------------------------ |
+| `chainId`   | string | Chain id used when signing. Agent routes require it to be present. |
+| `orderHash` | string | EIP-712 hash of the signed action object.                          |
+| `signature` | string | Signature over `orderHash`.                                        |
 
-The action object field changes by endpoint, for example `order`, `cancel`, `withdrawal`, `claim`, `resolution`, `approval`, `revocation`, `pause`, or `invalidate`.
+The action object field changes by endpoint, for example `order`, `cancel`, `cancelReplace`, `withdrawal`, `claim`, `approval`, or `revocation`. `POST /cancel-replace` also includes a `replacement` order, `replacementOrderHash`, and `replacementSignature`.
 
 ### Base Auth Fields
 
 These fields appear inside most signed action objects:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `typ` | string | Order type id. See the order type table below. |
-| `nonce` | string | Unique nonce for this signed action. Test scripts usually use `Date.now()`. |
-| `signer` | address | Address that signs the action. For agent requests, this is the agent address. |
-| `signatureType` | string | Signature type. `0` for EOA, `4` for agent. |
-| `sender` | address | Master account that owns the action. For EOA requests this normally matches `signer`. |
+| Field           | Type    | Description                                                                           |
+| --------------- | ------- | ------------------------------------------------------------------------------------- |
+| `typ`           | string  | Order type id. See the order type table below.                                        |
+| `nonce`         | string  | Unique nonce for this signed action.                                                  |
+| `signer`        | address | Address that signs the action. For agent requests, this is the agent address.         |
+| `signatureType` | string  | Signature type. `0` for EOA, `4` for agent.                                           |
+| `sender`        | address | Master account that owns the action. For EOA requests this normally matches `signer`. |
 
 ### Order Types
 
-| Value | Name | Used By |
-| --- | --- | --- |
-| `1` | `WITHDRAWAL` | `POST /withdrawals` |
-| `2` | `FILL` | `POST /orders`, replacement order inside `POST /cancel-replace` |
-| `3` | `CANCEL` | `POST /cancels` |
-| `4` | `RESOLUTION` | `POST /resolve` |
-| `5` | `CLAIM` | `POST /claim` |
-| `6` | `PAUSE` | `POST /admin/pause` |
-| `60` | `INVALIDATE` | `POST /admin/invalidate` |
-| `61` | `AGENT_APPROVE` | `POST /agents/approve` |
-| `62` | `AGENT_REVOKE` | `POST /agents/revoke` |
-| `63` | `CANCEL_REPLACE` | `POST /cancel-replace` |
+| Value | Name             | Used By                                                         |
+| ----- | ---------------- | --------------------------------------------------------------- |
+| `1`   | `WITHDRAWAL`     | `POST /withdrawals`                                             |
+| `2`   | `FILL`           | `POST /orders`, replacement order inside `POST /cancel-replace` |
+| `3`   | `CANCEL`         | `POST /cancels`                                                 |
+| `5`   | `CLAIM`          | `POST /claim`                                                   |
+| `61`  | `AGENT_APPROVE`  | `POST /agents/approve`                                          |
+| `62`  | `AGENT_REVOKE`   | `POST /agents/revoke`                                           |
+| `63`  | `CANCEL_REPLACE` | `POST /cancel-replace`                                          |
 
 ### L2Level
 
 Used in order book responses.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `price` | string | Price level. |
-| `size` | string | Aggregated size at this price level. |
-| `orderCount` | number | Number of resting orders at this price level. |
-| `orders` | array | Optional per-order data at the level. |
-| `orders[].id` | string | Resting order id/hash. |
-| `orders[].size` | string | Resting order size. |
-| `orders[].price` | number | Resting order price. |
-| `orders[].time` | number | Optional timestamp associated with the order. |
-| `orders[].account` | address | Optional account that owns the order. |
+| Field              | Type    | Description                                   |
+| ------------------ | ------- | --------------------------------------------- |
+| `price`            | string  | Price level.                                  |
+| `size`             | string  | Aggregated size at this price level.          |
+| `orderCount`       | number  | Number of resting orders at this price level. |
+| `orders`           | array   | Optional per-order data at the level.         |
+| `orders[].id`      | string  | Resting order id/hash.                        |
+| `orders[].size`    | string  | Resting order size.                           |
+| `orders[].price`   | number  | Resting order price.                          |
+| `orders[].time`    | number  | Optional timestamp associated with the order. |
+| `orders[].account` | address | Optional account that owns the order.         |
 
 ### NewOrderResponse
 
 Returned by `POST /orders` and as the `replacement` field of `POST /cancel-replace`.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `orderId` | string | Order id/hash. |
-| `filled` | string | Quantity filled by the relayer. |
-| `remaining` | string | Quantity still open. |
-| `cancelled` | string | Quantity cancelled. |
-| `status` | string | `ACCEPTED`, `CANCELLED`, `REJECTED`, `FILLED`, or `PARTIALLY_FILLED`. |
-| `reason` | string | Empty on normal success, or rejection reason such as `IOC`, `FOK`, `MARGIN`, `INVALID_ORDER`, `MARKET_RESOLVED`, `INTERNAL_ERROR`, `ALO`, or `UNKNOWN`. |
+| Field       | Type   | Description                                                                                                                                             |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orderId`   | string | Order id/hash.                                                                                                                                          |
+| `filled`    | string | Quantity filled by the relayer.                                                                                                                         |
+| `remaining` | string | Quantity still open.                                                                                                                                    |
+| `cancelled` | string | Quantity cancelled.                                                                                                                                     |
+| `status`    | string | `ACCEPTED`, `CANCELLED`, `REJECTED`, `FILLED`, or `PARTIALLY_FILLED`.                                                                                   |
+| `reason`    | string | Empty on normal success, or rejection reason such as `IOC`, `FOK`, `MARGIN`, `INVALID_ORDER`, `MARKET_RESOLVED`, `INTERNAL_ERROR`, `ALO`, or `UNKNOWN`. |
 
 ### CancelResponse
 
 Returned by `POST /cancels` and inside `POST /cancel-replace`.
 
-| Field | Type | Description                                                                                                                                                                                                                                                               |
-| --- | --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `id` | string | Cancel request id/hash.                                                                                                                                                                                                                                                   |
+| Field      | Type     | Description                                                                                                                                                                                                                                                               |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`       | string   | Cancel request id/hash.                                                                                                                                                                                                                                                   |
 | `orderIds` | string[] | Order ids affected by the cancel.                                                                                                                                                                                                                                         |
-| `status` | string | `CANCELLED`, `CANCEL_FAILED`, or `CANCEL_NOT_COMMITTED`. `CANCEL_NOT_COMMITTED` means the cancel leg was valid, but was not journal-committed because the replacement leg failed and the cancel-replace request was treated atomically (e.g. allOrNothing flag was true). |
+| `status`   | string   | `CANCELLED`, `CANCEL_FAILED`, or `CANCEL_NOT_COMMITTED`. `CANCEL_NOT_COMMITTED` means the cancel leg was valid, but was not journal-committed because the replacement leg failed and the cancel-replace request was treated atomically (e.g. allOrNothing flag was true). |
 
 ### CancelReplaceResponse
 
 Returned by `POST /cancel-replace`.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `id` | string | Cancel-replace request id/hash. |
-| `cancel` | object | Cancel leg response. Uses `CancelResponse`. |
-| `replacement` | object or null | Replacement order response. Uses `NewOrderResponse` when present. |
-| `status` | string | `CANCEL_FAILED`, `REPLACEMENT_FAILED`, `CANCEL_COMMITTED_REPLACEMENT_FAILED`, or `SUCCESS`. |
+| Field         | Type           | Description                                                                                 |
+| ------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| `id`          | string         | Cancel-replace request id/hash.                                                             |
+| `cancel`      | object         | Cancel leg response. Uses `CancelResponse`.                                                 |
+| `replacement` | object or null | Replacement order response. Uses `NewOrderResponse` when present.                           |
+| `status`      | string         | `CANCEL_FAILED`, `REPLACEMENT_FAILED`, `CANCEL_COMMITTED_REPLACEMENT_FAILED`, or `SUCCESS`. |
 
 ### Simple Status Responses
 
-| Model | Fields | Description |
-| --- | --- | --- |
-| `ClaimResponse` | `id`, `status` | `status` is `CLAIMED` or `CLAIM_FAILED`. |
+| Model                       | Fields         | Description                                     |
+| --------------------------- | -------------- | ----------------------------------------------- |
+| `ClaimResponse`             | `id`, `status` | `status` is `CLAIMED` or `CLAIM_FAILED`.        |
 | `WithdrawalRequestResponse` | `id`, `status` | `status` is `WITHDRAWN` or `WITHDRAWAL_FAILED`. |
-| `ApproveAgentResponse` | `id`, `status` | `status` is `SUCCESS` or `FAIL`. |
-| `RevokeAgentResponse` | `id`, `status` | `status` is `SUCCESS` or `FAIL`. |
+| `ApproveAgentResponse`      | `id`, `status` | `status` is `SUCCESS` or `FAIL`.                |
+| `RevokeAgentResponse`       | `id`, `status` | `status` is `SUCCESS` or `FAIL`.                |
 
 ## Endpoints
 
@@ -286,18 +290,18 @@ Returns the current balance snapshot for an account.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type    | Description               |
+| --------- | ------- | ------------------------- |
 | `account` | address | Account address to query. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `account` | address | Account address for the snapshot. |
-| `ts` | number | Timestamp generated when the snapshot response is returned. |
-| `balance` | string | Available ledger balance. |
-| `pending` | string | Pending ledger balance. |
+| Field     | Type    | Description                                                 |
+| --------- | ------- | ----------------------------------------------------------- |
+| `account` | address | Account address for the snapshot.                           |
+| `ts`      | number  | Timestamp generated when the snapshot response is returned. |
+| `balance` | string  | Available ledger balance.                                   |
+| `pending` | string  | Pending ledger balance.                                     |
 
 #### Errors
 
@@ -313,28 +317,28 @@ Returns the position snapshot for an account in a market epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type    | Description               |
+| --------- | ------- | ------------------------- |
 | `account` | address | Account address to query. |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `assetId` | string  | Market asset id.          |
+| `epoch`   | string  | Market epoch.             |
 
 #### Response: 200
 
-| Field | Type | Description                                                                             |
-| --- | --- |-----------------------------------------------------------------------------------------|
-| `account` | address | Account address for the position.                                                       |
-| `assetId` | string | Market asset id.                                                                        |
-| `epoch` | string | Market epoch.                                                                           |
-| `ts` | number | Position snapshot timestamp.                                                            |
-| `size` | string | Position size.                                                                          |
-| `margin` | string | Position margin.                                                                        |
-| `balance` | string | Position balance.                                                                       |
-| `pnl` | string | Profit and loss for the position (only updates when position is closed and not flipped). |
-| `side` | boolean | Position side.                                                                          |
-| `bSide` | boolean | Balance side flag.                                                                      |
-| `mSide` | boolean | Margin side flag.                                                                       |
-| `pSide` | boolean | PnL side flag.                                    |
+| Field     | Type    | Description                                                                              |
+| --------- | ------- | ---------------------------------------------------------------------------------------- |
+| `account` | address | Account address for the position.                                                        |
+| `assetId` | string  | Market asset id.                                                                         |
+| `epoch`   | string  | Market epoch.                                                                            |
+| `ts`      | number  | Position snapshot timestamp.                                                             |
+| `size`    | string  | Position size.                                                                           |
+| `margin`  | string  | Position margin.                                                                         |
+| `balance` | string  | Position balance.                                                                        |
+| `pnl`     | string  | Profit and loss for the position (only updates when position is closed and not flipped). |
+| `side`    | boolean | Position side.                                                                           |
+| `bSide`   | boolean | Balance side flag.                                                                       |
+| `mSide`   | boolean | Margin side flag.                                                                        |
+| `pSide`   | boolean | PnL side flag.                                                                           |
 
 #### Errors
 
@@ -353,56 +357,27 @@ Returns registered asset metadata for the latest/current asset state.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
 
 #### Response: 200
 
-| Field | Type | Description                                               |
-| --- | --- |-----------------------------------------------------------|
-| `assetId` | string | Market asset id from the request.                         |
-| `epoch` | string | Current asset epoch (starts at epoch 0).                  |
-| `registered` | boolean | Whether the asset is registered.                          |
-| `expiration` | string | Current expiration timestamp in unix seconds.             |
-| `assetType` | string | Asset type id (1 = single epoch, 2 = recurring epoch).    |
-| `strikePrice` | string | Strike price for the current asset epoch (price to beat). |
-| `ledger` | address | Ledger contract address associated with the asset.        |
+| Field         | Type    | Description                                               |
+| ------------- | ------- | --------------------------------------------------------- |
+| `assetId`     | string  | Market asset id from the request.                         |
+| `epoch`       | string  | Current asset epoch (starts at epoch 0).                  |
+| `registered`  | boolean | Whether the asset is registered.                          |
+| `expiration`  | string  | Current expiration timestamp in unix seconds.             |
+| `assetType`   | string  | Asset type id (1 = single epoch, 2 = recurring epoch).    |
+| `strikePrice` | string  | Strike price for the current asset epoch (price to beat). |
+| `ledger`      | address | Ledger contract address associated with the asset.        |
 
 #### Errors
 
 - `404 INVALID_ASSET_ID`
 - `404 ASSET_ID_NOT_REGISTERED`
 - `404 ASSET_NOT_FOUND`
-- `500 INTERNAL_ERROR`
-
-### GET /asset/:assetId/:epoch
-
-Returns epoch-specific asset data.
-
-#### Path Parameters
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
-
-#### Response: 200
-
-| Field | Type | Description                                                    |
-| --- | --- |----------------------------------------------------------------|
-| `assetId` | string | Market asset id from the request.                              |
-| `epoch` | string | Market epoch from the request.                                 |
-| `expiration` | string | Expiration timestamp for this asset epoch.                     |
-| `strikePrice` | string | Strike price for this asset epoch (price to beat).             |
-| `resolutionPrice` | string | Resolution price for this asset epoch, or `0` when unresolved. |
-
-#### Errors
-
-- `404 INVALID_ASSET_ID`
-- `404 INVALID_EPOCH`
-- `404 ASSET_ID_NOT_REGISTERED`
-- `404 ASSET_EPOCH_NOT_FOUND`
 - `500 INTERNAL_ERROR`
 
 ## Order Book
@@ -413,23 +388,23 @@ Returns the top of book for a market epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `epoch`   | string | Market epoch.    |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `seqId` | number | Order book sequence id. |
-| `ts` | number | Snapshot timestamp. |
-| `bid` | object | Best bid level. Uses `L2Level`. |
-| `ask` | object | Best ask level. Uses `L2Level`. |
-| `last` | string | Last traded price or last book value from the snapshot. |
-| `lastTs` | string | Timestamp for the `last` value. |
+| Field     | Type   | Description                                             |
+| --------- | ------ | ------------------------------------------------------- |
+| `assetId` | string | Market asset id from the request.                       |
+| `epoch`   | string | Market epoch from the request.                          |
+| `seqId`   | number | Order book sequence id.                                 |
+| `ts`      | number | Snapshot timestamp.                                     |
+| `bid`     | object | Best bid level. Uses `L2Level`.                         |
+| `ask`     | object | Best ask level. Uses `L2Level`.                         |
+| `last`    | string | Last traded price or last book value from the snapshot. |
+| `lastTs`  | string | Timestamp for the `last` value.                         |
 
 #### Errors
 
@@ -445,27 +420,27 @@ Returns an order book snapshot for a market epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `epoch`   | string | Market epoch.    |
 
 #### Query Parameters
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `depth` | number | `200` | Maximum number of bid and ask levels to return. Clamped from `1` to `5000`. |
+| Field   | Type   | Default | Description                                                                 |
+| ------- | ------ | ------- | --------------------------------------------------------------------------- |
+| `depth` | number | `200`   | Maximum number of bid and ask levels to return. Clamped from `1` to `5000`. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description                       |
+| --------- | ------ | --------------------------------- |
 | `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `ts` | number | Snapshot timestamp. |
-| `seqId` | number | Order book sequence id. |
-| `bids` | array | Bid levels, each using `L2Level`. |
-| `asks` | array | Ask levels, each using `L2Level`. |
+| `epoch`   | string | Market epoch from the request.    |
+| `ts`      | number | Snapshot timestamp.               |
+| `seqId`   | number | Order book sequence id.           |
+| `bids`    | array  | Bid levels, each using `L2Level`. |
+| `asks`    | array  | Ask levels, each using `L2Level`. |
 
 #### Errors
 
@@ -481,22 +456,22 @@ Returns resting book orders owned by one account.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| Field     | Type    | Description                                      |
+| --------- | ------- | ------------------------------------------------ |
+| `assetId` | string  | Market asset id.                                 |
+| `epoch`   | string  | Market epoch.                                    |
 | `account` | address | Account address whose orders should be returned. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `seqId` | number | Order book sequence id. |
-| `ts` | number | Snapshot timestamp. |
-| `buys` | array | Account-owned bid orders found in level `orders` arrays. |
-| `sells` | array | Account-owned ask orders found in level `orders` arrays. |
+| Field     | Type   | Description                                              |
+| --------- | ------ | -------------------------------------------------------- |
+| `assetId` | string | Market asset id from the request.                        |
+| `epoch`   | string | Market epoch from the request.                           |
+| `seqId`   | number | Order book sequence id.                                  |
+| `ts`      | number | Snapshot timestamp.                                      |
+| `buys`    | array  | Account-owned bid orders found in level `orders` arrays. |
+| `sells`   | array  | Account-owned ask orders found in level `orders` arrays. |
 
 Each item in `buys` and `sells` is the per-order item from an `L2Level.orders` array.
 
@@ -509,123 +484,6 @@ Each item in `buys` and `sells` is the per-order item from an `L2Level.orders` a
 - `404 ORDERBOOK_NOT_FOUND`
 - `500 INTERNAL_ERROR`
 
-## Ledger
-
-### GET /ledger/orders/:assetId/:epoch
-
-Returns ledger orders for an asset epoch.
-
-#### Path Parameters
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
-
-#### Response: 200
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `ts` | number | Snapshot timestamp. |
-| `orders` | array | Ledger order objects. BigInt fields are serialized as decimal strings. |
-
-Ledger order fields include:
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `id` | string | Order id/hash. |
-| `type` | string | Order type label. |
-| `side` | string or boolean | Order side from the order book implementation. |
-| `epoch` | string | Market epoch. |
-| `size` | string | Original order size. |
-| `price` | string | Order price. |
-| `limitPrice` | string | Limit price used by the matching engine. |
-| `account` | address | Account that owns the order. |
-| `assetId` | string | Market asset id. |
-| `filled` | string | Filled amount. |
-| `remaining` | string | Remaining amount. |
-| `reservedPosition` | string | Reserved position amount. |
-| `reservedSize` | string | Reserved size amount. |
-| `reservedMargin` | string | Reserved margin amount. |
-| `maxSize` | string | Maximum fill size. |
-| `timeInForce` | string | Time in force label or value. |
-| `nonce` | string | User nonce used when signing. |
-| `signer` | address | Address that signed the order. |
-| `signature` | string | Signature used for the order. |
-| `signatureType` | string | Signature type. |
-| `approvalSignature` | string | Agent approval signature, when applicable. |
-| `approvalNonce` | string | Agent approval nonce, when applicable. |
-| `seq` | string | Order book sequence. |
-| `lastTxId` | string | Last transaction id that updated the order. |
-| `version` | string | Stored order version. |
-
-#### Errors
-
-- `404 INVALID_ASSET_ID`
-- `404 ASSET_ID_NOT_REGISTERED`
-- `404 INVALID_EPOCH`
-- `404 ORDERS_NOT_FOUND`
-- `500 INTERNAL_ERROR`
-
-### GET /ledger/orders/:assetId/:epoch/:account
-
-Returns ledger orders for one account in an asset epoch.
-
-#### Path Parameters
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
-| `account` | address | Account address whose ledger orders should be returned. |
-
-#### Response: 200
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `account` | address | Account address from the request. |
-| `ts` | number | Snapshot timestamp. |
-| `orders` | array | Ledger order objects. See `GET /ledger/orders/:assetId/:epoch`. |
-
-#### Errors
-
-- `404 INVALID_ACCOUNT`
-- `404 INVALID_ASSET_ID`
-- `404 INVALID_EPOCH`
-- `404 ASSET_ID_NOT_REGISTERED`
-- `404 ORDERS_NOT_FOUND`
-- `500 INTERNAL_ERROR`
-
-### GET /ledger/entries/:seqId
-
-Returns ledger journal entries for a sequence id.
-
-#### Path Parameters
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `seqId` | string | Ledger sequence id. Must be a BigInt-compatible decimal string. |
-
-#### Response: 200
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `seqId` | string | Ledger sequence id from the request. |
-| `ts` | number | Snapshot timestamp. |
-| `entries` | array | Ledger journal entries. BigInt fields are serialized as decimal strings. |
-
-Journal entries are typed records for deposits, withdrawals, fills, cancels, resolutions, claims, or on-chain deposits.
-
-#### Errors
-
-- `404 INVALID_SEQID`
-- `404 ENTRIES_NOT_FOUND`
-- `500 INTERNAL_ERROR`
-
 ## Orders
 
 ### POST /orders
@@ -634,24 +492,24 @@ Submits a signed order and waits for the relayer response.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `order` | object | EIP-712 order payload. |
-| `order.typ` | string | Must be `2` for `FILL`. |
-| `order.nonce` | string | Unique nonce for this order. |
-| `order.signer` | address | Address that signed the order hash. |
-| `order.signatureType` | string | `0` for EOA or `4` for an approved agent. |
-| `order.sender` | address | Account that owns the order. |
-| `order.epoch` | string | Market epoch. |
-| `order.side` | boolean | `false` for buy, `true` for sell. |
-| `order.assetId` | string | Market asset id. |
-| `order.size` | string | Order size. |
-| `order.price` | string | Limit price. |
-| `order.timeInForce` | string | Time in force: `0`, `1`, `2`, or `3`. |
-| `order.approvalNonce` | string | Agent approval nonce. Use `0` for EOA orders. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `order`. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                 | Type    | Description                                   |
+| --------------------- | ------- | --------------------------------------------- |
+| `order`               | object  | EIP-712 order payload.                        |
+| `order.typ`           | string  | Must be `2` for `FILL`.                       |
+| `order.nonce`         | string  | Unique nonce for this order.                  |
+| `order.signer`        | address | Address that signed the order hash.           |
+| `order.signatureType` | string  | `0` for EOA or `4` for an approved agent.     |
+| `order.sender`        | address | Account that owns the order.                  |
+| `order.epoch`         | string  | Market epoch.                                 |
+| `order.side`          | boolean | `false` for buy, `true` for sell.             |
+| `order.assetId`       | string  | Market asset id.                              |
+| `order.size`          | string  | Order size.                                   |
+| `order.price`         | string  | Limit price.                                  |
+| `order.timeInForce`   | string  | Time in force: `0`, `1`, `2`, or `3`.         |
+| `order.approvalNonce` | string  | Agent approval nonce. Use `0` for EOA orders. |
+| `chainId`             | string  | Chain id used when signing.                   |
+| `orderHash`           | string  | EIP-712 hash of `order`.                      |
+| `signature`           | string  | Signature over `orderHash`.                   |
 
 #### Response: 202
 
@@ -679,25 +537,25 @@ Returns `NewOrderResponse`.
 
 ### POST /cancels
 
-Submits a signed cancel request. Passing the zero hash as `cancel.orderHash` is treated as cancel-all by the test script when the CLI argument is `all`.
+Submits a signed cancel request. Passing the zero hash as `cancel.orderHash` requests cancel-all.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `cancel` | object | EIP-712 cancel payload. |
-| `cancel.typ` | string | Must be `3` for `CANCEL`. |
-| `cancel.nonce` | string | Unique nonce for this cancel. |
-| `cancel.signer` | address | Address that signed the cancel hash. |
-| `cancel.signatureType` | string | `0` for EOA or `4` for an approved agent. |
-| `cancel.sender` | address | Account that owns the order being cancelled. |
-| `cancel.assetId` | string | Market asset id. |
-| `cancel.epoch` | string | Market epoch. |
-| `cancel.orderHash` | string | Order id/hash to cancel. Zero hash means cancel all. |
-| `cancel.approvalNonce` | string | Agent approval nonce. Use `0` for EOA cancels. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `cancel`. This is the cancel request id. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                  | Type    | Description                                              |
+| ---------------------- | ------- | -------------------------------------------------------- |
+| `cancel`               | object  | EIP-712 cancel payload.                                  |
+| `cancel.typ`           | string  | Must be `3` for `CANCEL`.                                |
+| `cancel.nonce`         | string  | Unique nonce for this cancel.                            |
+| `cancel.signer`        | address | Address that signed the cancel hash.                     |
+| `cancel.signatureType` | string  | `0` for EOA or `4` for an approved agent.                |
+| `cancel.sender`        | address | Account that owns the order being cancelled.             |
+| `cancel.assetId`       | string  | Market asset id.                                         |
+| `cancel.epoch`         | string  | Market epoch.                                            |
+| `cancel.orderHash`     | string  | Order id/hash to cancel. Zero hash means cancel all.     |
+| `cancel.approvalNonce` | string  | Agent approval nonce. Use `0` for EOA cancels.           |
+| `chainId`              | string  | Chain id used when signing.                              |
+| `orderHash`            | string  | EIP-712 hash of `cancel`. This is the cancel request id. |
+| `signature`            | string  | Signature over `orderHash`.                              |
 
 #### Response: 202
 
@@ -730,26 +588,26 @@ Side of replacement order must match the side of the cancelled order.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `cancelReplace` | object | EIP-712 cancel-replace payload. |
-| `cancelReplace.typ` | string | Must be `63` for `CANCEL_REPLACE`. |
-| `cancelReplace.nonce` | string | Unique nonce for the cancel-replace action. |
-| `cancelReplace.signer` | address | Address that signed the cancel-replace hash. |
-| `cancelReplace.signatureType` | string | `0` for EOA or `4` for an approved agent. |
-| `cancelReplace.sender` | address | Account that owns the cancelled and replacement orders. |
-| `cancelReplace.assetId` | string | Market asset id. Must match `replacement.assetId`. |
-| `cancelReplace.epoch` | string | Market epoch. Must match `replacement.epoch`. |
-| `cancelReplace.cancelOrderHash` | string | Existing order id/hash to cancel. Cannot be zero hash. |
-| `cancelReplace.replacementOrderHash` | string | EIP-712 hash of the replacement order. |
-| `cancelReplace.approvalNonce` | string | Agent approval nonce. Must match `replacement.approvalNonce`. |
-| `cancelReplace.allOrNothing` | boolean | Whether the combined action should be all-or-nothing. Defaults to `false` when omitted. |
-| `replacement` | object | Replacement EIP-712 order payload. Same fields as `POST /orders` `order`. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `cancelReplace`. |
-| `signature` | string | Signature over `orderHash`. |
-| `replacementOrderHash` | string | EIP-712 hash of `replacement`. |
-| `replacementSignature` | string | Signature over `replacementOrderHash`. |
+| Field                                | Type    | Description                                                                             |
+| ------------------------------------ | ------- | --------------------------------------------------------------------------------------- |
+| `cancelReplace`                      | object  | EIP-712 cancel-replace payload.                                                         |
+| `cancelReplace.typ`                  | string  | Must be `63` for `CANCEL_REPLACE`.                                                      |
+| `cancelReplace.nonce`                | string  | Unique nonce for the cancel-replace action.                                             |
+| `cancelReplace.signer`               | address | Address that signed the cancel-replace hash.                                            |
+| `cancelReplace.signatureType`        | string  | `0` for EOA or `4` for an approved agent.                                               |
+| `cancelReplace.sender`               | address | Account that owns the cancelled and replacement orders.                                 |
+| `cancelReplace.assetId`              | string  | Market asset id. Must match `replacement.assetId`.                                      |
+| `cancelReplace.epoch`                | string  | Market epoch. Must match `replacement.epoch`.                                           |
+| `cancelReplace.cancelOrderHash`      | string  | Existing order id/hash to cancel. Cannot be zero hash.                                  |
+| `cancelReplace.replacementOrderHash` | string  | EIP-712 hash of the replacement order.                                                  |
+| `cancelReplace.approvalNonce`        | string  | Agent approval nonce. Must match `replacement.approvalNonce`.                           |
+| `cancelReplace.allOrNothing`         | boolean | Whether the combined action should be all-or-nothing. Defaults to `false` when omitted. |
+| `replacement`                        | object  | Replacement EIP-712 order payload. Same fields as `POST /orders` `order`.               |
+| `chainId`                            | string  | Chain id used when signing.                                                             |
+| `orderHash`                          | string  | EIP-712 hash of `cancelReplace`.                                                        |
+| `signature`                          | string  | Signature over `orderHash`.                                                             |
+| `replacementOrderHash`               | string  | EIP-712 hash of `replacement`.                                                          |
+| `replacementSignature`               | string  | Signature over `replacementOrderHash`.                                                  |
 
 #### Response: 202
 
@@ -801,20 +659,20 @@ Submits a signed withdrawal request.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `withdrawal` | object | EIP-712 withdrawal payload. |
-| `withdrawal.typ` | string | Must be `1` for `WITHDRAWAL`. |
-| `withdrawal.nonce` | string | Unique nonce for this withdrawal. |
-| `withdrawal.signer` | address | Address that signed the withdrawal hash. |
-| `withdrawal.signatureType` | string | Signature type. The test script uses `0`. |
-| `withdrawal.sender` | address | Account paying the withdrawal. |
-| `withdrawal.receiver` | address | Account receiving withdrawn funds. |
-| `withdrawal.amount` | string | Amount to withdraw. |
-| `withdrawal.ledger` | address | Ledger contract address. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `withdrawal`. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                      | Type    | Description                                  |
+| -------------------------- | ------- | -------------------------------------------- |
+| `withdrawal`               | object  | EIP-712 withdrawal payload.                  |
+| `withdrawal.typ`           | string  | Must be `1` for `WITHDRAWAL`.                |
+| `withdrawal.nonce`         | string  | Unique nonce for this withdrawal.            |
+| `withdrawal.signer`        | address | Address that signed the withdrawal hash.     |
+| `withdrawal.signatureType` | string  | Signature type. Use `0` for EOA withdrawals. |
+| `withdrawal.sender`        | address | Account paying the withdrawal.               |
+| `withdrawal.receiver`      | address | Account receiving withdrawn funds.           |
+| `withdrawal.amount`        | string  | Amount to withdraw.                          |
+| `withdrawal.ledger`        | address | Ledger contract address.                     |
+| `chainId`                  | string  | Chain id used when signing.                  |
+| `orderHash`                | string  | EIP-712 hash of `withdrawal`.                |
+| `signature`                | string  | Signature over `orderHash`.                  |
 
 #### Response: 202
 
@@ -872,20 +730,20 @@ Submits a signed claim request.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `claim` | object | EIP-712 claim payload. |
-| `claim.typ` | string | Must be `5` for `CLAIM`. |
-| `claim.nonce` | string | Unique nonce for this claim. |
-| `claim.signer` | address | Address that signed the claim hash. |
-| `claim.signatureType` | string | `0` for EOA or `4` for an approved agent. |
-| `claim.sender` | address | Account claiming funds. |
-| `claim.assetId` | string | Market asset id. |
-| `claim.epoch` | string | Market epoch. |
-| `claim.approvalNonce` | string | Agent approval nonce. Use `0` for EOA claims. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `claim`. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                 | Type    | Description                                   |
+| --------------------- | ------- | --------------------------------------------- |
+| `claim`               | object  | EIP-712 claim payload.                        |
+| `claim.typ`           | string  | Must be `5` for `CLAIM`.                      |
+| `claim.nonce`         | string  | Unique nonce for this claim.                  |
+| `claim.signer`        | address | Address that signed the claim hash.           |
+| `claim.signatureType` | string  | `0` for EOA or `4` for an approved agent.     |
+| `claim.sender`        | address | Account claiming funds.                       |
+| `claim.assetId`       | string  | Market asset id.                              |
+| `claim.epoch`         | string  | Market epoch.                                 |
+| `claim.approvalNonce` | string  | Agent approval nonce. Use `0` for EOA claims. |
+| `chainId`             | string  | Chain id used when signing.                   |
+| `orderHash`           | string  | EIP-712 hash of `claim`.                      |
+| `signature`           | string  | Signature over `orderHash`.                   |
 
 #### Response: 202
 
@@ -970,81 +828,27 @@ Returns the settlement price for an expired and resolved asset epoch.
 - `500 Unable to get settlement price`
 - `500 Internal enqueue error`
 
-### POST /resolve
-
-Submits a signed resolution. Agents are not allowed for this endpoint, and the route currently requires `resolution.signer` to differ from `resolution.sender`.
-
-#### Request Body
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `resolution` | object | EIP-712 resolution payload. |
-| `resolution.typ` | string | Must be `4` for `RESOLUTION`. |
-| `resolution.nonce` | string | Unique nonce for this resolution. |
-| `resolution.signer` | address | Address that signed the resolution hash. Must differ from `resolution.sender`. |
-| `resolution.signatureType` | string | Signature type. Must not be agent. |
-| `resolution.sender` | address | Resolver account. Must be authorized as a resolver and differ from `resolution.signer`. |
-| `resolution.assetId` | string | Market asset id. |
-| `resolution.epoch` | string | Market epoch. |
-| `resolution.price` | string | Resolution price. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `resolution`. |
-| `signature` | string | Signature over `orderHash`. |
-
-#### Response: 200
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | string | `SUCCESS` when the resolution was committed. |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
-| `price` | string | Committed resolution price. |
-
-If the resolution is not found after enqueueing, the endpoint can return `404` with:
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | string | `FAIL`. |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
-
-#### Errors
-
-- `400 MISSING_ORDER_OR_SIGNATURE`
-- `400 SIGNER_NOT_SENDER`
-- `400 INVALID_AUTH_PARAMETERS`
-- `400 Invalid cancel parameters`
-- `400 CANNOT_RESOLVE_ASSET_ID`
-- `401 RESOLVE_ORDER_HASH_MISMATCH`
-- `401 INVALID_SIGNATURE`
-- `401 AGENT_NOT_ALLOWED`
-- `403 NOT_RESOLVER`
-- `404 ENTRY_PROCESSED`
-- `500 Internal enqueue error`
-
-Note: `src/test/sendTestResolution.ts` builds a `resolution` object with `epoch`, but the JSON body in the script currently omits `resolution.epoch`. The route contract requires `resolution.epoch`.
-
 ### GET /resolve/:assetId/:epoch
 
 Returns a stored resolution price for an asset epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `epoch`   | string | Market epoch.    |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `id` | number | Decoded base asset id. |
-| `ts` | string | Resolution timestamp. |
-| `price` | string | Resolution price. |
-| `isNull` | boolean | Whether the resolution is marked null. |
+| Field     | Type    | Description                            |
+| --------- | ------- | -------------------------------------- |
+| `assetId` | string  | Market asset id from the request.      |
+| `epoch`   | string  | Market epoch from the request.         |
+| `id`      | number  | Decoded base asset id.                 |
+| `ts`      | string  | Resolution timestamp.                  |
+| `price`   | string  | Resolution price.                      |
+| `isNull`  | boolean | Whether the resolution is marked null. |
 
 #### Errors
 
@@ -1060,20 +864,20 @@ Returns the latest stored resolution price for an asset.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Latest resolved epoch. |
-| `id` | number | Decoded base asset id. |
-| `ts` | string | Resolution timestamp. |
-| `price` | string | Resolution price. |
-| `isNull` | boolean | Whether the resolution is marked null. |
+| Field     | Type    | Description                            |
+| --------- | ------- | -------------------------------------- |
+| `assetId` | string  | Market asset id from the request.      |
+| `epoch`   | string  | Latest resolved epoch.                 |
+| `id`      | number  | Decoded base asset id.                 |
+| `ts`      | string  | Resolution timestamp.                  |
+| `price`   | string  | Resolution price.                      |
+| `isNull`  | boolean | Whether the resolution is marked null. |
 
 #### Errors
 
@@ -1089,20 +893,20 @@ Approves an agent to sign actions for a master account.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `approval` | object | EIP-712 approve-agent payload. |
-| `approval.typ` | string | Must be `61` for `AGENT_APPROVE`. |
-| `approval.nonce` | string | Unique nonce for this approval transaction. |
-| `approval.signer` | address | Must be the master account address. |
-| `approval.signatureType` | string | Must be `0` for EOA. |
-| `approval.sender` | address | Master account approving the agent. |
-| `approval.agent` | address | Agent address being approved. |
-| `approval.approvalNonce` | string | Approval expiration/nonce timestamp. Must be in the near future. |
-| `approval.approvalSignature` | string | Master signature over the agent approval hash. |
-| `chainId` | string | Chain id. This field is required by the route. |
-| `orderHash` | string | EIP-712 hash of `approval`. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                        | Type    | Description                                                      |
+| ---------------------------- | ------- | ---------------------------------------------------------------- |
+| `approval`                   | object  | EIP-712 approve-agent payload.                                   |
+| `approval.typ`               | string  | Must be `61` for `AGENT_APPROVE`.                                |
+| `approval.nonce`             | string  | Unique nonce for this approval transaction.                      |
+| `approval.signer`            | address | Must be the master account address.                              |
+| `approval.signatureType`     | string  | Must be `0` for EOA.                                             |
+| `approval.sender`            | address | Master account approving the agent.                              |
+| `approval.agent`             | address | Agent address being approved.                                    |
+| `approval.approvalNonce`     | string  | Approval expiration/nonce timestamp. Must be in the near future. |
+| `approval.approvalSignature` | string  | Master signature over the agent approval hash.                   |
+| `chainId`                    | string  | Chain id. This field is required by the route.                   |
+| `orderHash`                  | string  | EIP-712 hash of `approval`.                                      |
+| `signature`                  | string  | Signature over `orderHash`.                                      |
 
 #### Response: 202
 
@@ -1134,17 +938,17 @@ Revokes the current agent approval for a master account.
 
 #### Request Body
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `revocation` | object | EIP-712 revoke-agent payload. |
-| `revocation.typ` | string | Must be `62` for `AGENT_REVOKE`. |
-| `revocation.nonce` | string | Unique nonce for this revocation. |
-| `revocation.signer` | address | Must match `revocation.sender`. |
-| `revocation.signatureType` | string | Must be `0` for EOA. |
-| `revocation.sender` | address | Master account revoking the agent. |
-| `chainId` | string | Chain id. This field is required by the route. |
-| `orderHash` | string | EIP-712 hash of `revocation`. |
-| `signature` | string | Signature over `orderHash`. |
+| Field                      | Type    | Description                                    |
+| -------------------------- | ------- | ---------------------------------------------- |
+| `revocation`               | object  | EIP-712 revoke-agent payload.                  |
+| `revocation.typ`           | string  | Must be `62` for `AGENT_REVOKE`.               |
+| `revocation.nonce`         | string  | Unique nonce for this revocation.              |
+| `revocation.signer`        | address | Must match `revocation.sender`.                |
+| `revocation.signatureType` | string  | Must be `0` for EOA.                           |
+| `revocation.sender`        | address | Master account revoking the agent.             |
+| `chainId`                  | string  | Chain id. This field is required by the route. |
+| `orderHash`                | string  | EIP-712 hash of `revocation`.                  |
+| `signature`                | string  | Signature over `orderHash`.                    |
 
 #### Response: 202
 
@@ -1170,101 +974,19 @@ Returns current agent approval status for a master account.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field    | Type    | Description             |
+| -------- | ------- | ----------------------- |
 | `master` | address | Master account address. |
 
 #### Response: 202
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `agent` | address or empty string | Approved agent address, or empty string when no approval exists. |
-| `nonce` | string | Approval nonce or expiration timestamp. `0` when inactive. |
-| `status` | string | `active`, `inactive`, or `expired`. |
+| Field    | Type                    | Description                                                      |
+| -------- | ----------------------- | ---------------------------------------------------------------- |
+| `agent`  | address or empty string | Approved agent address, or empty string when no approval exists. |
+| `nonce`  | string                  | Approval nonce or expiration timestamp. `0` when inactive.       |
+| `status` | string                  | `active`, `inactive`, or `expired`.                              |
 
 #### Errors
 
 - `400 INVALID_MASTER`
-- `500 INTERNAL_ERROR`
-
-## Admin
-
-### POST /admin/pause
-
-Enqueues a pause or unpause operation. The sender must be an admin, and the route currently requires `pause.signer` to differ from `pause.sender`.
-
-#### Request Body
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `pause` | object | EIP-712 pause payload. |
-| `pause.typ` | string | Must be `6` for `PAUSE`. |
-| `pause.nonce` | string | Unique nonce for this admin action. |
-| `pause.signer` | address | Address that signed the pause hash. Must differ from `pause.sender`. |
-| `pause.signatureType` | string | Signature type. |
-| `pause.sender` | address | Admin account. Must differ from `pause.signer`. |
-| `pause.isPause` | boolean | `true` to pause, `false` to unpause. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `pause`. |
-| `signature` | string | Signature over `orderHash`. |
-
-#### Response: 202
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | string | Always `enqueued` when accepted. |
-| `orderId` | string | Pause request id/hash. |
-
-#### Errors
-
-- `400 MISSING_ROLLBACK_OR_SIGNATURE`
-- `400 SIGNER_NOT_SENDER`
-- `400 Invalid auth parameters`
-- `400 Invalid claim parameters`
-- `400 CONTRACT_ALREADY_PAUSED`
-- `400 CONTRACT_NOT_PAUSED`
-- `401 ORDER_HASH_MISMATCH`
-- `401 INVALID_SIGNATURE`
-- `403 NOT_ADMIN`
-- `404 ENTRY_PROCESSED`
-- `500 INTERNAL_ERROR`
-
-### POST /admin/invalidate
-
-Enqueues an invalidate operation while the contract is paused. The sender must be an admin, and the route currently requires `invalidate.signer` to differ from `invalidate.sender`.
-
-#### Request Body
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `invalidate` | object | EIP-712 invalidate payload. |
-| `invalidate.typ` | string | Must be `60` for `INVALIDATE`. |
-| `invalidate.nonce` | string | Unique nonce for this admin action. |
-| `invalidate.signer` | address | Address that signed the invalidate hash. Must differ from `invalidate.sender`. |
-| `invalidate.signatureType` | string | Signature type. |
-| `invalidate.sender` | address | Admin account. Must differ from `invalidate.signer`. |
-| `invalidate.id` | string | Transaction id to invalidate. Must match the current on-chain tx id. |
-| `chainId` | string | Chain id used by the signing script. |
-| `orderHash` | string | EIP-712 hash of `invalidate`. |
-| `signature` | string | Signature over `orderHash`. |
-
-#### Response: 202
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `status` | string | Always `enqueued` when accepted. |
-| `orderId` | string | Invalidate request id/hash. |
-
-#### Errors
-
-- `400 MISSING_ROLLBACK_OR_SIGNATURE`
-- `400 SIGNER_NOT_SENDER`
-- `400 Invalid auth parameters`
-- `400 Invalid claim parameters`
-- `400 INVALID_TX_ID`
-- `400 CONTRACT_NOT_PAUSED`
-- `401 ORDER_HASH_MISMATCH`
-- `401 INVALID_SIGNATURE`
-- `403 NOT_ADMIN`
-- `404 ENTRY_PROCESSED`
 - `500 INTERNAL_ERROR`
