@@ -39,6 +39,90 @@ https://exchange-api.gammaswap.com/api
 | `0` | `EOA` | The sender signs directly. |
 | `4` | `AGENT` | An approved agent signs for the sender. |
 
+### Signed Message Hashing
+
+Signed POST endpoints use the same EIP-712 signing flow. The request contains one action object, such as `order`, `cancel`, `withdrawal`, `claim`, `resolution`, `approval`, `revocation`, `pause`, or `invalidate`, plus an `orderHash` and `signature`.
+
+The field name `orderHash` is historical: for every signed endpoint it means "the EIP-712 digest of the signed action object." It is not a hash of the outer HTTP request body, and it does not include `signature`.
+
+The SDK computes signed action hashes in three steps:
+
+1. Build or parse the action object using the SDK schema so numeric fields are represented as `bigint`.
+2. Compute the action-specific struct hash with the action type hash and ABI-encoded fields in canonical order.
+3. Compute the final EIP-712 digest:
+
+```text
+keccak256("\x19\x01" || domainSeparator || actionStructHash)
+```
+
+The EIP-712 domain is:
+
+```text
+name: GammaSwap Exchange
+version: 2
+chainId: request chainId
+verifyingContract: exchange verifying contract
+```
+
+The client signs that digest directly and sends the original action object, `chainId`, `orderHash`, and `signature`. The server recomputes the same digest from the submitted action object and domain, recovers the signer from `signature`, and compares it with the action's `signer`.
+
+This works because the digest commits to the exact action type, field names, field order, Solidity integer widths, addresses, chain id, and verifying contract. Changing any signed field changes the digest and invalidates the signature. The domain prevents replaying the same signed action against a different chain or verifying contract.
+
+Use the action-specific SDK hash helper:
+
+| Action object | Endpoint | Hash helper |
+| --- | --- | --- |
+| `order` | `POST /orders` | `hashFillOrderJS` |
+| `cancel` | `POST /cancels` | `hashCancelOrderJS` |
+| `cancelReplace` | `POST /cancel-replace` | `hashCancelReplaceOrderJS` |
+| `replacement` | `POST /cancel-replace` | `hashFillOrderJS` |
+| `withdrawal` | `POST /withdrawals` | `hashWithdrawalOrderJS` |
+| `claim` | `POST /claim` | `hashClaimOrderJS` |
+| `resolution` | `POST /resolve` | `hashResolutionOrderJS` |
+| `approval` | `POST /agents/approve` | `hashApproveAgentOrderJS` |
+| `revocation` | `POST /agents/revoke` | `hashRevokeAgentOrderJS` |
+| `pause` | `POST /admin/pause` | `hashPauseOrderJS` |
+| `invalidate` | `POST /admin/invalidate` | `hashInvalidateOrderJS` |
+
+Example for `POST /orders`:
+
+```ts
+import {
+  buildOrder,
+  buildSignedOrderMessageJson,
+  getExchangeDomain,
+  hashFillOrderJS,
+  signOrderJS,
+} from "@gammaswap/v2-exchange-sdk";
+
+const order = buildOrder({
+  nonce,
+  signer: wallet.address,
+  signatureType: 0n,
+  sender: wallet.address,
+  epoch,
+  side: false,
+  assetId,
+  size,
+  price,
+  timeInForce: 0n,
+  approvalNonce: 0n,
+});
+
+const domain = getExchangeDomain(chainId, verifyingContract);
+const orderHash = hashFillOrderJS(order, domain);
+const signature = signOrderJS(orderHash, wallet);
+
+const body = buildSignedOrderMessageJson({
+  order,
+  chainId,
+  orderHash,
+  signature,
+});
+```
+
+For `POST /cancel-replace`, the replacement order is signed separately with `hashFillOrderJS(replacement, domain)`, and the cancel-replace action signs the resulting `replacementOrderHash` with `hashCancelReplaceOrderJS(cancelReplace, domain)`.
+
 ## Local Test Scripts
 
 The package scripts in `package.json` exercise these endpoints:
