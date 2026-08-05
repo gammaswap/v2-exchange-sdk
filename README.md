@@ -58,6 +58,51 @@ String-shaped helpers are exported from `@gammaswap/v2-exchange-sdk/string-input
 for EVM addresses, non-zero addresses, hex data, bytes32 values, and
 case-insensitive address comparison.
 
+### Request input conventions
+
+- `ProtocolBigNumberish`: `bigint` or canonical decimal string.
+- `HumanDecimalString`: human decimal string such as `"10"`, `"10.25"`, or
+  `"99.9"`.
+- `Address`: EVM address string.
+- `HexString`: hex string. Order IDs and hashes are represented as `bytes32`
+  hex strings.
+- Optional `nonce` fields are filled by the configured `NonceManager` when
+  omitted.
+
+### Nonce generation
+
+`NonceManager` generates unsigned 64-bit nonces as `bigint` values. The nonce is
+laid out as:
+
+```text
+[ 48-bit timestamp in milliseconds ][ 16-bit counter ]
+```
+
+`nonceManager.next()` reads `Date.now()` by default. When the physical clock has
+advanced since the previous generated nonce, the timestamp portion is updated and
+the counter resets to `0`. If another nonce is requested in the same millisecond,
+or if the system clock moves backward, the manager keeps the previous logical
+timestamp and increments the 16-bit counter.
+
+The counter range is `0` through `65,535`, so at most `65,536` nonces can share
+the same logical millisecond. If more nonces are requested before the physical
+clock advances, the SDK does not throw or block; it advances its logical
+timestamp by one millisecond and resets the counter. It continues generating
+monotonically increasing nonces, but the timestamp portion can move ahead of
+wall-clock time under extremely high throughput or a backward-moving system
+clock.
+
+This is a per-millisecond counter limit, not a limit on the number of signed
+messages or open orders. The SDK does not track whether generated nonces are
+pending, accepted, rejected, or already submitted; it only generates the next
+value in the local sequence.
+
+The uniqueness guarantee is local to one `NonceManager` instance. It does not
+coordinate across browser tabs, Node processes, servers, devices, or separate
+SDK clients using the same account. If multiple writers sign actions for the
+same account, share a nonce allocator, reuse one `NonceManager`, or pass explicit
+nonces from your own coordinated source.
+
 ## InfoClient
 
 `InfoClient` is the read-only HTTP client for exchange API data.
@@ -88,6 +133,22 @@ const info = createInfoClient({
 - `getAgentApproval(inputOrAccount)`
 - `getAgentApprovalNonce(inputOrAccount)`
 - `getExchangeConfig(inputOrChainId)`
+
+### GET request inputs:
+
+| Function                                 | Route                                    | Input fields                                                                      |
+| ---------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| `getAsset(inputOrAssetId)`               | `GET /asset/:assetId`                    | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getResolutionPrice(input)`              | `GET /resolve/:assetId/:epoch`           | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getLastResolutionPrice(inputOrAssetId)` | `GET /resolve/last/epoch/:assetId`       | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getBalance(inputOrAccount)`             | `GET /balance/:account`                  | `account`: account address. Accepts `{ account }` or the address directly.        |
+| `getOrderBook(input)`                    | `GET /book/:assetId/:epoch`              | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getBookOrders(input)`                   | `GET /book/:assetId/:epoch/:account`     | `assetId`: market asset id. `epoch`: market epoch. `account`: account address.    |
+| `getTopOfBook(input)`                    | `GET /book/market/top/:assetId/:epoch`   | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getPosition(input)`                     | `GET /position/:account/:assetId/:epoch` | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
+| `getAgentApproval(inputOrAccount)`       | `GET /agents/status/:master`             | `account`: master account address. Accepts `{ account }` or the address directly. |
+| `getAgentApprovalNonce(inputOrAccount)`  | `GET /agents/status/:master`             | Same input as `getAgentApproval`; returns only the parsed approval nonce.         |
+| `getExchangeConfig(inputOrChainId)`      | `GET /config/chains/:chainId`            | `chainId`: exchange chain id. Accepts `{ chainId }` or the chain id directly.     |
 
 ### Notes:
 
@@ -150,6 +211,50 @@ const exchange = createExchangeClient({
 - `revokeAgent(input)`
 - `signAgentApproval(input)`
 
+### Signed POST request inputs:
+
+These functions sign and submit an API request. The SDK fills `signer`,
+`signatureType`, `chainId`, `orderHash`, and `signature` from the configured
+wallet, chain, contracts, and input fields. For EOA requests, the SDK also uses
+the configured wallet address as `sender`.
+
+| Function                         | Route                  | Input fields                                                                                                                                                    |
+| -------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `placeOrder(input)`              | `POST /orders`         | `assetId`, `epoch`, `side`, `price`, `size`, optional `timeInForce`, optional `nonce`.                                                                          |
+| `placeAgentOrder(input)`         | `POST /orders`         | `assetId`, `epoch`, `side`, `price`, `size`, `sender`, optional `timeInForce`, optional `nonce`, optional `approvalNonce`.                                      |
+| `cancelOrder(input)`             | `POST /cancels`        | `assetId`, `epoch`, `orderHash`, optional `nonce`.                                                                                                              |
+| `cancelAll(input)`               | `POST /cancels`        | `assetId`, `epoch`, optional `nonce`. Uses the zero hash internally.                                                                                            |
+| `cancelReplaceOrder(input)`      | `POST /cancel-replace` | `assetId`, `epoch`, `cancelOrderHash`, `side`, `price`, `size`, optional `timeInForce`, optional `nonce`, optional `replacementNonce`, optional `allOrNothing`. |
+| `cancelAgentOrder(input)`        | `POST /cancels`        | `assetId`, `epoch`, `orderHash`, `sender`, optional `nonce`, optional `approvalNonce`.                                                                          |
+| `cancelAllAgent(input)`          | `POST /cancels`        | `assetId`, `epoch`, `sender`, optional `nonce`, optional `approvalNonce`. Uses the zero hash internally.                                                        |
+| `cancelReplaceAgentOrder(input)` | `POST /cancel-replace` | Same input as `cancelReplaceOrder`, plus `sender` and optional `approvalNonce`.                                                                                 |
+| `claim(input)`                   | `POST /claim`          | `assetId`, `epoch`, optional `nonce`.                                                                                                                           |
+| `claimAgent(input)`              | `POST /claim`          | `assetId`, `epoch`, `sender`, optional `nonce`, optional `approvalNonce`.                                                                                       |
+| `withdraw(input)`                | `POST /withdrawals`    | `amount`, optional `nonce`, optional `receiver`.                                                                                                                |
+| `approveAgent(input)`            | `POST /agents/approve` | `agent`, optional `approvalNonce`, optional `nonce`.                                                                                                            |
+| `revokeAgent(input)`             | `POST /agents/revoke`  | Optional `nonce`.                                                                                                                                               |
+
+#### Signed POST field descriptions:
+
+| Field              | Meaning                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `assetId`          | Market asset id.                                                                               |
+| `epoch`            | Market epoch.                                                                                  |
+| `side`             | `false` for buy, `true` for sell.                                                              |
+| `price`            | Human decimal limit price string. One decimal place is allowed and interpreted as cents.       |
+| `size`             | Human decimal order size string. Up to two decimal places.                                     |
+| `amount`           | Human decimal withdrawal amount string. Up to two decimal places.                              |
+| `timeInForce`      | Optional time-in-force value. Defaults to `TimeInForce.GTC`.                                   |
+| `nonce`            | Optional action nonce. Defaults to `nonceManager.next()`.                                      |
+| `replacementNonce` | Optional nonce for the replacement order in cancel-replace. Defaults to `nonceManager.next()`. |
+| `orderHash`        | Existing order id/hash to cancel.                                                              |
+| `cancelOrderHash`  | Existing non-zero order id/hash to cancel before submitting the replacement order.             |
+| `allOrNothing`     | Optional cancel-replace atomicity flag. Defaults to `false`.                                   |
+| `sender`           | Master account address when the configured wallet signs as an approved agent.                  |
+| `approvalNonce`    | Agent approval nonce. If omitted on agent actions, the SDK fetches it from `InfoClient`.       |
+| `receiver`         | Optional withdrawal receiver. Defaults to the configured wallet address.                       |
+| `agent`            | Agent address being approved. Must differ from the configured wallet address.                  |
+
 ### Notes:
 
 - Signed actions are strongly typed and reject unknown input fields at compile
@@ -174,9 +279,9 @@ flows.
 import { Wallet } from "ethers";
 
 const deposit = createDepositClient({
-    rpcUrl: `BASE_SEPOLIA_RPC_URL`,
-    wallet: new Wallet(process.env.PRIVATE_KEY!),
-    chainId: "84532",
+  rpcUrl: `BASE_SEPOLIA_RPC_URL`,
+  wallet: new Wallet(process.env.PRIVATE_KEY!),
+  chainId: "84532",
 });
 ```
 
@@ -234,15 +339,12 @@ const ws = createExchangeWebSocketClient({
   onError: (error) => console.error(error),
 });
 
-const unsubscribe = await ws.subscribeOrderBook(
-  "ASSET_ID",
-  {
-    onUpdate: (update) => console.log(update),
-    onResyncRequired: (assetId) => {
-      console.log("Reload full book from REST for", assetId);
-    },
+const unsubscribe = await ws.subscribeOrderBook("ASSET_ID", {
+  onUpdate: (update) => console.log(update),
+  onResyncRequired: (assetId) => {
+    console.log("Reload full book from REST for", assetId);
   },
-);
+});
 
 await unsubscribe();
 ws.close();
