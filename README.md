@@ -69,6 +69,40 @@ case-insensitive address comparison.
 - Optional `nonce` fields are filled by the configured `NonceManager` when
   omitted.
 
+### Nonce generation
+
+`NonceManager` generates unsigned 64-bit nonces as `bigint` values. The nonce is
+laid out as:
+
+```text
+[ 48-bit timestamp in milliseconds ][ 16-bit counter ]
+```
+
+`nonceManager.next()` reads `Date.now()` by default. When the physical clock has
+advanced since the previous generated nonce, the timestamp portion is updated and
+the counter resets to `0`. If another nonce is requested in the same millisecond,
+or if the system clock moves backward, the manager keeps the previous logical
+timestamp and increments the 16-bit counter.
+
+The counter range is `0` through `65,535`, so at most `65,536` nonces can share
+the same logical millisecond. If more nonces are requested before the physical
+clock advances, the SDK does not throw or block; it advances its logical
+timestamp by one millisecond and resets the counter. It continues generating
+monotonically increasing nonces, but the timestamp portion can move ahead of
+wall-clock time under extremely high throughput or a backward-moving system
+clock.
+
+This is a per-millisecond counter limit, not a limit on the number of signed
+messages or open orders. The SDK does not track whether generated nonces are
+pending, accepted, rejected, or already submitted; it only generates the next
+value in the local sequence.
+
+The uniqueness guarantee is local to one `NonceManager` instance. It does not
+coordinate across browser tabs, Node processes, servers, devices, or separate
+SDK clients using the same account. If multiple writers sign actions for the
+same account, share a nonce allocator, reuse one `NonceManager`, or pass explicit
+nonces from your own coordinated source.
+
 ## InfoClient
 
 `InfoClient` is the read-only HTTP client for exchange API data.
