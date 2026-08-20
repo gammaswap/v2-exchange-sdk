@@ -25,19 +25,19 @@ https://exchange-api.gammaswap.com/api
 - `side` is a boolean order direction: `false` means buy, `true` means sell.
 - `timeInForce` can be passed as a string or number-like value and is normalized to:
 
-| Value | Name  | Meaning               |
-| ----- | ----- | --------------------- |
-| `0`   | `GTC` | Good until cancelled. |
-| `1`   | `FOK` | Fill or kill.         |
-| `2`   | `IOC` | Immediate or cancel.  |
-| `3`   | `ALO` | Add liquidity only.   |
+| Value | Name | Meaning |
+| --- | --- | --- |
+| `0` | `GTC` | Good until cancelled. |
+| `1` | `FOK` | Fill or kill. |
+| `2` | `IOC` | Immediate or cancel. |
+| `3` | `ALO` | Add liquidity only. |
 
-- `signatureType` values used by this API are:
+- `signatureType` values used by this package are:
 
-| Value | Name    | Meaning                                 |
-| ----- | ------- | --------------------------------------- |
-| `0`   | `EOA`   | The sender signs directly.              |
-| `4`   | `AGENT` | An approved agent signs for the sender. |
+| Value | Name | Meaning |
+| --- | --- | --- |
+| `0` | `EOA` | The sender signs directly. |
+| `4` | `AGENT` | An approved agent signs for the sender. |
 
 ### Authentication
 
@@ -306,7 +306,15 @@ Returns the current balance snapshot for an account.
 #### Errors
 
 - `404 INVALID_ACCOUNT` when `account` is not a valid address.
-- `404 BALANCE_NOT_FOUND` when no balance snapshot is available.
+- `503` when the API cannot enqueue the balance snapshot request or times out waiting for the relayer. Timeout responses currently have this shape:
+
+  ```json
+  {
+    "type": "TIMEOUT",
+    "message": "Timed out waiting for BALANCE response from relayer"
+  }
+  ```
+- `404 BALANCE_NOT_FOUND` if no balance snapshot is available.
 - `500 INTERNAL_ERROR` for unexpected failures.
 
 ## Position
@@ -346,7 +354,11 @@ Returns the position snapshot for an account in a market epoch.
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
 - `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
 - `404 POSITION_NOT_FOUND`
+- `503` when the position snapshot lookup fails.
 - `500 INTERNAL_ERROR`
 
 ## Assets
@@ -363,21 +375,61 @@ Returns registered asset metadata for the latest/current asset state.
 
 #### Response: 200
 
-| Field         | Type    | Description                                               |
-| ------------- | ------- | --------------------------------------------------------- |
-| `assetId`     | string  | Market asset id from the request.                         |
-| `epoch`       | string  | Current asset epoch (starts at epoch 0).                  |
-| `registered`  | boolean | Whether the asset is registered.                          |
-| `expiration`  | string  | Current expiration timestamp in unix seconds.             |
-| `assetType`   | string  | Asset type id (1 = single epoch, 2 = recurring epoch).    |
-| `strikePrice` | string  | Strike price for the current asset epoch (price to beat). |
-| `ledger`      | address | Ledger contract address associated with the asset.        |
+| Field | Type | Description                                               |
+| --- | --- |-----------------------------------------------------------|
+| `assetId` | string | Market asset id from the request.                         |
+| `epoch` | string | Current asset epoch (starts at epoch 0).                  |
+| `registered` | boolean | Whether the asset is registered.                          |
+| `expiration` | string | Current expiration timestamp in unix seconds.             |
+| `assetType` | string | Asset type id (1 = single epoch, 2 = recurring epoch).    |
+| `strikePrice` | string | Strike price for the current asset epoch (price to beat). |
+| `resolutionPrice` | string | Resolution price for the current asset epoch, or `0` when unresolved. |
+| `isResolved` | boolean | Whether the current asset epoch has been resolved. |
+| `ledger` | address | Ledger contract address associated with the asset.        |
 
 #### Errors
 
 - `404 INVALID_ASSET_ID`
 - `404 ASSET_ID_NOT_REGISTERED`
 - `404 ASSET_NOT_FOUND`
+- `503` when the current asset state lookup fails.
+- `500 INTERNAL_ERROR`
+
+### GET /asset/:assetId/:epoch
+
+Returns epoch-specific asset data.
+
+#### Path Parameters
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `assetId` | string | Market asset id. |
+| `epoch` | string | Market epoch. |
+
+#### Response: 200
+
+| Field | Type | Description                                                    |
+| --- | --- |----------------------------------------------------------------|
+| `assetId` | string | Market asset id from the request.                              |
+| `epoch` | string | Market epoch from the request.                                 |
+| `expiration` | string | Expiration timestamp for this asset epoch.                     |
+| `strikePrice` | string | Strike price for this asset epoch (price to beat).             |
+| `resolutionPrice` | string | Resolution price for this asset epoch, or `0` when unresolved. |
+| `registered` | boolean | Whether the asset is registered.                               |
+| `assetType` | string | Asset type id (1 = single epoch, 2 = recurring epoch).        |
+| `isResolved` | boolean | Whether this asset epoch has been resolved.                   |
+| `ledger` | address | Ledger contract address associated with the asset.             |
+
+#### Errors
+
+- `404 INVALID_ASSET_ID`
+- `404 INVALID_EPOCH`
+- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
+- `404 ASSET_EPOCH_NOT_FOUND`
+- `503` when the asset-epoch state lookup fails.
 - `500 INTERNAL_ERROR`
 
 ## Order Book
@@ -410,8 +462,9 @@ Returns the top of book for a market epoch.
 
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
-- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_REGISTERED`
 - `404 ORDERBOOK_NOT_FOUND`
+- `503` when the order-book snapshot lookup fails.
 - `500 INTERNAL_ERROR`
 
 ### GET /book/:assetId/:epoch
@@ -446,8 +499,9 @@ Returns an order book snapshot for a market epoch.
 
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
-- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_REGISTERED`
 - `404 ORDERBOOK_NOT_FOUND`
+- `503` when the order-book snapshot lookup fails.
 - `500 INTERNAL_ERROR`
 
 ### GET /book/:assetId/:epoch/:account
@@ -481,7 +535,11 @@ Each item in `buys` and `sells` is the per-order item from an `L2Level.orders` a
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
 - `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
 - `404 ORDERBOOK_NOT_FOUND`
+- `503` when the order-book snapshot lookup fails.
 - `500 INTERNAL_ERROR`
 
 ## Orders
@@ -523,13 +581,18 @@ Returns `NewOrderResponse`.
 - `400 INVALID_SIZE`
 - `400 Invalid auth parameters`
 - `400 Invalid order parameters`
-- `400 ASSET_ID_NOT_AVAILABLE`
+- `404 EPOCH_RESOLVED`
 - `401 ORDER_HASH_MISMATCH`
 - `401 INVALID_SIGNATURE`
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
+- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
 - `404 ENTRY_PROCESSED`
 - `404 ORDER_NOT_FOUND`
+- `503` when the order cannot be enqueued.
 - agent auth errors from the agent approval checks
 - `500 Internal enqueue error`
 
@@ -537,7 +600,7 @@ Returns `NewOrderResponse`.
 
 ### POST /cancels
 
-Submits a signed cancel request. Passing the zero hash as `cancel.orderHash` requests cancel-all.
+Submits a signed cancel request. Passing the zero hash as `cancel.orderHash` is treated as cancel-all by the test script when the CLI argument is `all`.
 
 #### Request Body
 
@@ -571,10 +634,15 @@ Returns `CancelResponse`.
 - `401 INVALID_SIGNATURE`
 - `404 INVALID_ACCOUNT`
 - `404 INVALID_ASSET_ID`
-- `404 ENTRY_PROCESSED`
+- `404 INVALID_EPOCH`
 - `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
+- `404 ENTRY_PROCESSED`
 - `404 ORDERBOOK_NOT_FOUND`
 - `404 CANCELLATION_NOT_FOUND`
+- `503` when the cancel or order-book request cannot be loaded or enqueued.
 - agent auth errors from the agent approval checks
 - `500 Unable to check order status on-chain`
 - `500 Internal enqueue error`
@@ -648,6 +716,7 @@ Returns `CancelReplaceResponse`.
 - `404 REPLACEMENT_ENTRY_PROCESSED`
 - `404 ORDERBOOK_NOT_FOUND`
 - `404 CANCEL_REPLACE_NOT_FOUND`
+- `503` when the asset, order-book, or cancel-replace request cannot be loaded or enqueued.
 - agent auth errors from the agent approval checks
 - `500 Internal enqueue error`
 
@@ -688,7 +757,11 @@ Returns `WithdrawalRequestResponse`.
 - `401 INVALID_SIGNATURE`
 - `404 ENTRY_PROCESSED`
 - `404 WITHDRAWAL_REQUEST_NOT_FOUND`
+- `400 WITHDRAWAL_AMOUNT_ZERO`
+- `400 FAILED_TO_VALIDATE_LEDGER`
+- `503` when the withdrawal request cannot be enqueued.
 - `500 Unable to check wallet ledger balance on-chain`
+- `500 Unable to validate ledger on-chain`
 - `500 Internal enqueue error`
 
 ## Claims
@@ -721,7 +794,12 @@ Returns the amount claimable by an account for a resolved asset epoch.
 - `404 INVALID_EPOCH`
 - `404 ASSET_ID_NOT_REGISTERED`
 - `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
 - `404 EPOCH_NOT_RESOLVED`
+- `404 POSITION_NOT_FOUND` with an error object containing `reason`, `account`, `assetId`, and `epoch`
+- `404` with the state lookup error object when the relayer response times out
+- `503` when the position snapshot lookup fails.
 - `500 INTERNAL_ERROR`
 
 ### POST /claim
@@ -762,9 +840,13 @@ Returns `ClaimResponse`.
 - `404 ENTRY_PROCESSED`
 - `404 ASSET_ID_NOT_REGISTERED`
 - `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
 - `404 EPOCH_NOT_RESOLVED`
 - `404 NO_CLAIMABLE_AMOUNT`
 - `404 CLAIM_NOT_FOUND`
+- `404` with the state lookup error object when the relayer response times out
+- `503` when the claim request cannot be enqueued or the position snapshot lookup fails.
 - agent auth errors from the agent approval checks
 - `500 INTERNAL_ERROR`
 
@@ -793,6 +875,8 @@ Returns the current oracle mark price for the decoded base asset id.
 
 - `404 INVALID_ASSET_ID`
 - `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
 - `500 Unable to get current price`
 - `500 Internal enqueue error`
 
@@ -822,10 +906,12 @@ Returns the settlement price for an expired and resolved asset epoch.
 
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
-- `400 ASSET_ID_NOT_AVAILABLE`
-- `404 ASSET_ID_NOT_EXPIRED`
-- `404 ASSET_ID_NOT_RESOLVED`
-- `500 Unable to get settlement price`
+- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
+- `404 EPOCH_NOT_RESOLVED`
+- `404` with the state lookup error object when the relayer response times out
 - `500 Internal enqueue error`
 
 ### GET /resolve/:assetId/:epoch
@@ -854,8 +940,11 @@ Returns a stored resolution price for an asset epoch.
 
 - `404 INVALID_ASSET_ID`
 - `404 INVALID_EPOCH`
-- `400 ASSET_ID_NOT_AVAILABLE`
-- `404 RESOLUTION_NOT_FOUND`
+- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
+- `404` with the state lookup error object when the relayer response times out
 - `500 Internal enqueue error`
 
 ### GET /resolve/last/epoch/:assetId
@@ -882,7 +971,11 @@ Returns the latest stored resolution price for an asset.
 #### Errors
 
 - `404 INVALID_ASSET_ID`
-- `404 RESOLUTION_NOT_FOUND`
+- `404 ASSET_ID_NOT_REGISTERED`
+- `404 ASSET_NOT_FOUND`
+- `404 ASSET_NOT_SUPPORTED`
+- `404 EPOCH_NOT_SUPPORTED`
+- `404` with the state lookup error object when the relayer response times out
 - `500 Internal enqueue error`
 
 ## Agents
@@ -929,6 +1022,7 @@ Returns `ApproveAgentResponse`.
 - `401 INVALID_APPROVAL_SIGNATURE`
 - `404 ENTRY_PROCESSED`
 - `404` with a failed approval response when relayer status is `FAIL`
+- `503` when the approval request cannot be enqueued.
 - `429` for agent rate limit failures
 - `500 INTERNAL_ERROR`
 
@@ -965,6 +1059,7 @@ Returns `RevokeAgentResponse`.
 - `401 INVALID_SIGNATURE`
 - `404 ENTRY_PROCESSED`
 - `404` with a failed revocation response when relayer status is `FAIL`
+- `503` when the revocation request cannot be enqueued.
 - `429` for agent rate limit failures
 - `500 INTERNAL_ERROR`
 
@@ -989,4 +1084,5 @@ Returns current agent approval status for a master account.
 #### Errors
 
 - `400 INVALID_MASTER`
+- `503` when the approval lookup fails.
 - `500 INTERNAL_ERROR`
