@@ -44,12 +44,17 @@ import {
 import {
   getAgentApprovalRequestSchema,
   getAssetRequestSchema,
+  getAssetAtEpochRequestSchema,
+  parseAssetSnapshot,
   getBalanceRequestSchema,
   getBookOrdersRequestSchema,
   getExchangeConfigRequestSchema,
   getLastResolutionPriceRequestSchema,
   getOrderBookRequestSchema,
   getPositionRequestSchema,
+  getClaimableRequestSchema,
+  getMarkPriceRequestSchema,
+  getSettlementPriceRequestSchema,
   getResolutionPriceRequestSchema,
   getTopOfBookRequestSchema,
   parseExchangeChainConfig,
@@ -66,15 +71,20 @@ import type {
   ExchangeContractsInput,
   GetAgentApprovalRequest,
   GetAssetRequest,
+  GetAssetAtEpochRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
   GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetClaimableRequest,
+  GetMarkPriceRequest,
+  GetSettlementPriceRequest,
   GetResolutionPriceRequest,
   GetTopOfBookRequest,
   JsonExchangeChainConfig,
+  AssetSnapshot,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
   JsonSignedCancelReplaceMessage,
@@ -171,13 +181,28 @@ export class InfoClient {
     this.headers = options.headers ?? {};
   }
 
+  async getHealth(): Promise<HttpResult> {
+    return this.get("/health");
+  }
+
   async getAsset(
     input: ProtocolInput<GetAssetRequest> | ProtocolBigNumberish,
-  ): Promise<HttpResult> {
+  ): Promise<HttpResult<AssetSnapshot>> {
     const request = getAssetRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
-    return this.get(`/asset/${encodePathSegment(request.assetId)}`);
+    const response = await this.get(`/asset/${encodePathSegment(request.assetId)}`);
+    return { ...response, data: parseAssetSnapshot(response.data) };
+  }
+
+  async getAssetAtEpoch(
+    input: ProtocolInput<GetAssetAtEpochRequest>,
+  ): Promise<HttpResult<AssetSnapshot>> {
+    const request = getAssetAtEpochRequestSchema.parse(input);
+    const response = await this.get(
+      `/asset/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+    );
+    return { ...response, data: parseAssetSnapshot(response.data) };
   }
 
   async getResolutionPrice(input: ProtocolInput<GetResolutionPriceRequest>): Promise<HttpResult> {
@@ -232,6 +257,33 @@ export class InfoClient {
       `/position/${encodePathSegment(request.account)}/${encodePathSegment(
         request.assetId,
       )}/${encodePathSegment(request.epoch)}`,
+    );
+  }
+
+  async getClaimable(input: ProtocolInput<GetClaimableRequest>): Promise<HttpResult> {
+    const request = getClaimableRequestSchema.parse(input);
+    return this.get(
+      `/claim/${encodePathSegment(request.assetId)}/${encodePathSegment(
+        request.epoch,
+      )}/${encodePathSegment(request.account)}`,
+    );
+  }
+
+  async getMarkPrice(
+    input: ProtocolInput<GetMarkPriceRequest> | ProtocolBigNumberish,
+  ): Promise<HttpResult> {
+    const request = getMarkPriceRequestSchema.parse(
+      typeof input === "object" && input !== null ? input : { assetId: input },
+    );
+    return this.get(`/resolve/mark/${encodePathSegment(request.assetId)}`);
+  }
+
+  async getSettlementPrice(input: ProtocolInput<GetSettlementPriceRequest>): Promise<HttpResult> {
+    const request = getSettlementPriceRequestSchema.parse(input);
+    return this.get(
+      `/resolve/settlement/${encodePathSegment(request.assetId)}/${encodePathSegment(
+        request.epoch,
+      )}`,
     );
   }
 

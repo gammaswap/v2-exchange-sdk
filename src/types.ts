@@ -409,6 +409,11 @@ export interface GetAssetRequest {
   assetId: bigint;
 }
 
+export interface GetAssetAtEpochRequest {
+  assetId: bigint;
+  epoch: bigint;
+}
+
 export interface GetResolutionPriceRequest {
   assetId: bigint;
   epoch: bigint;
@@ -443,6 +448,35 @@ export interface GetPositionRequest {
   assetId: bigint;
   epoch: bigint;
 }
+
+export interface GetClaimableRequest {
+  account: Address;
+  assetId: bigint;
+  epoch: bigint;
+}
+
+export interface GetMarkPriceRequest {
+  assetId: bigint;
+}
+
+export interface GetSettlementPriceRequest {
+  assetId: bigint;
+  epoch: bigint;
+}
+
+export interface AssetSnapshot {
+  assetId: bigint;
+  epoch: bigint;
+  registered: boolean;
+  expiration: bigint;
+  assetType: bigint;
+  strikePrice: bigint;
+  resolutionPrice: bigint;
+  isResolved: boolean;
+  ledger: Address;
+}
+
+export type JsonAssetSnapshot = ProtocolJson<AssetSnapshot>;
 
 export interface GetAgentApprovalRequest {
   account: Address;

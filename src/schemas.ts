@@ -29,12 +29,17 @@ import type {
   ExchangeContracts,
   GetAgentApprovalRequest,
   GetAssetRequest,
+  GetAssetAtEpochRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
   GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetClaimableRequest,
+  GetMarkPriceRequest,
+  GetSettlementPriceRequest,
+  AssetSnapshot,
   GetResolutionPriceRequest,
   GetTopOfBookRequest,
   OraclePriceUpdate,
@@ -591,6 +596,27 @@ export const getAssetRequestSchema = objectSchema<GetAssetRequest>({
   assetId: uint256,
 });
 
+export const getAssetAtEpochRequestSchema = objectSchema<GetAssetAtEpochRequest>({
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const assetSnapshotSchema = objectSchema<AssetSnapshot>({
+  assetId: uint256,
+  epoch: uint32,
+  registered: boolean,
+  expiration: uint64,
+  assetType: uint256,
+  strikePrice: uint256,
+  resolutionPrice: uint256,
+  isResolved: boolean,
+  ledger: address,
+});
+
+export function parseAssetSnapshot(input: unknown): AssetSnapshot {
+  return assetSnapshotSchema.parse(input);
+}
+
 export const getResolutionPriceRequestSchema = objectSchema<GetResolutionPriceRequest>({
   assetId: uint256,
   epoch: uint32,
@@ -622,6 +648,21 @@ export const getTopOfBookRequestSchema = objectSchema<GetTopOfBookRequest>({
 
 export const getPositionRequestSchema = objectSchema<GetPositionRequest>({
   account: address,
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const getClaimableRequestSchema = objectSchema<GetClaimableRequest>({
+  account: address,
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const getMarkPriceRequestSchema = objectSchema<GetMarkPriceRequest>({
+  assetId: uint256,
+});
+
+export const getSettlementPriceRequestSchema = objectSchema<GetSettlementPriceRequest>({
   assetId: uint256,
   epoch: uint32,
 });

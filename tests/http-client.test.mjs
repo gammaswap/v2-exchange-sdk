@@ -72,6 +72,21 @@ function response({ status = 200, statusText = "OK", data = {} } = {}) {
   };
 }
 
+function assetSnapshot(overrides = {}) {
+  return {
+    assetId: "1",
+    epoch: "2",
+    registered: true,
+    expiration: "1700000900",
+    assetType: "2",
+    strikePrice: "50000000",
+    resolutionPrice: "0",
+    isResolved: false,
+    ledger: LEDGER,
+    ...overrides,
+  };
+}
+
 function baseOrderInput(overrides = {}) {
   return {
     nonce: "1",
@@ -171,6 +186,14 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
       return { data: exchangeConfig() };
     }
 
+    if (new URL(call.url).pathname === "/api/asset/1") {
+      return { data: assetSnapshot({ assetId: "1" }) };
+    }
+
+    if (new URL(call.url).pathname === "/api/asset/2/3") {
+      return { data: assetSnapshot({ assetId: "2", epoch: "3" }) };
+    }
+
     return { data: { ok: true } };
   });
   const client = createInfoClient({
@@ -178,7 +201,9 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
     fetch: mock.fetch,
   });
 
+  await client.getHealth();
   await client.getAsset("1");
+  const historicalAsset = await client.getAssetAtEpoch({ assetId: "2", epoch: "3" });
   await client.getResolutionPrice({ assetId: "2", epoch: "3" });
   await client.getLastResolutionPrice("2");
   await client.getBalance(MASTER);
@@ -186,15 +211,22 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
   await client.getBookOrders({ assetId: "2", epoch: "3", account: MASTER });
   await client.getTopOfBook({ assetId: "2", epoch: "3" });
   await client.getPosition({ account: MASTER, assetId: "2", epoch: "3" });
+  await client.getClaimable({ account: MASTER, assetId: "2", epoch: "3" });
+  await client.getMarkPrice("2");
+  await client.getSettlementPrice({ assetId: "2", epoch: "3" });
   await client.getAgentApproval(MASTER);
   const config = await client.getExchangeConfig("31337");
 
   assert.deepEqual(config.data, exchangeConfig());
+  assert.equal(historicalAsset.data.epoch, 3n);
+  assert.equal(historicalAsset.data.resolutionPrice, 0n);
 
   assert.deepEqual(
     mock.calls.map((call) => call.url),
     [
+      "http://localhost:3000/api/health",
       "http://localhost:3000/api/asset/1",
+      "http://localhost:3000/api/asset/2/3",
       "http://localhost:3000/api/resolve/2/3",
       "http://localhost:3000/api/resolve/last/epoch/2",
       `http://localhost:3000/api/balance/${MASTER}`,
@@ -202,6 +234,9 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
       `http://localhost:3000/api/book/2/3/${MASTER}`,
       "http://localhost:3000/api/book/market/top/2/3",
       `http://localhost:3000/api/position/${MASTER}/2/3`,
+      `http://localhost:3000/api/claim/2/3/${MASTER}`,
+      "http://localhost:3000/api/resolve/mark/2",
+      "http://localhost:3000/api/resolve/settlement/2/3",
       `http://localhost:3000/api/agents/status/${MASTER}`,
       "http://localhost:3000/api/config/chains/31337",
     ],
