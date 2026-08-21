@@ -813,15 +813,6 @@ export interface OraclePriceSubscriptionHandlers {
     onStale?: (symbolId: string) => void;
 }
 
-export interface Asset {
-    strikePrice: bigint;
-    ledger: string;
-    expiration: bigint;
-    assetType: bigint;
-    registered: boolean;
-    epoch: bigint;
-}
-
 /**
  * AssetId encoding/decoding utilities
  *
@@ -845,78 +836,4 @@ export interface DecodedAssetId {
     range: number;        // uint16 — range
     reserved: string;     // uint56 — reserved
     expiration: number;   // startTime + periodLength (convenience)
-}
-
-export interface AssetEpochData {
-    expiration: bigint;
-    strikePrice: bigint;
-    resolutionPrice: bigint;
-}
-
-export interface AssetData {
-    assetId: bigint;
-    id: number;           // uint64 — base asset id
-    marketType: number;   // uint8 — asset type (1 = up/down, etc.)
-    startTime: number;    // uint32 — market start timestamp
-    periodLength: number; // uint32 — period in seconds (e.g. 900 for 15m)
-    strikePrice: bigint;  // uint48 — strike/priceChange per asset type
-    range: bigint;
-    expiration: bigint;   // startTime + periodLength (convenience)
-    resolutionPrice: bigint;
-    isResolved: boolean;
-    reserved: string;     // uint72 — reserved
-}
-
-export type L2Level = {
-    price: string;      // string to avoid float drift / JSON issues
-    size: string;       // aggregated size at this price
-    orderCount: number; // number of resting orders at this price
-    orders?: Array<{
-        id: string;
-        size: string;
-        price: number;
-        time?: number;
-        account?: string;
-    }>;
-};
-
-export type OrderBookTopSnapshot = {
-    ts: number;
-    seqId: number;
-    bid: L2Level;
-    ask: L2Level;
-    last: string;
-    lastTs: string;
-};
-
-export type OrderBookSnapshot = {
-    ts: number;
-    seqId: number;
-    lastOp?: string | number;
-    bids: L2Level[];
-    asks: L2Level[];
-    // include stopBook if you use conditional orders in your instance
-    stopBook?: unknown;
-};
-
-export interface BalanceSnapshot {
-    account: string;
-    ts: number;
-    balance: bigint;
-    pending: bigint;
-}
-
-export interface PositionSnapshot {
-    account: string;
-    assetId: bigint;
-    epoch: bigint;
-    ts: number;
-    size: bigint;
-    margin: bigint;
-    balance: bigint;
-    pnl: bigint;
-    side: boolean;
-    bSide: boolean;
-    mSide: boolean;
-    pSide: boolean;
 }
