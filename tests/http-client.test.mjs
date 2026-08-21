@@ -627,6 +627,153 @@ test("InfoClient rejects malformed successful informational responses", async ()
   );
 });
 
+test("InfoClient validates every informational response shape", async () => {
+  const cases = [
+    {
+      name: "health",
+      call: (client) => client.getHealth(),
+      data: { status: "healthy" },
+      path: "$.status",
+    },
+    {
+      name: "current asset",
+      call: (client) => client.getAsset("1"),
+      data: assetSnapshot({ strikePrice: "invalid" }),
+      path: "$.strikePrice",
+    },
+    {
+      name: "historical asset",
+      call: (client) => client.getAssetAtEpoch({ assetId: "1", epoch: "2" }),
+      data: assetSnapshot({ expiration: "invalid" }),
+      path: "$.expiration",
+    },
+    {
+      name: "resolution price",
+      call: (client) => client.getResolutionPrice({ assetId: "1", epoch: "2" }),
+      data: { assetId: "1", epoch: "2", id: "3", ts: "4", price: "invalid", isNull: false },
+      path: "$.price",
+    },
+    {
+      name: "last resolution price",
+      call: (client) => client.getLastResolutionPrice("1"),
+      data: { assetId: "1", epoch: "2", id: "3", ts: "4", price: "5", isNull: "false" },
+      path: "$.isNull",
+    },
+    {
+      name: "balance",
+      call: (client) => client.getBalance(MASTER),
+      data: { account: MASTER, ts: "4", balance: "invalid", pending: "0" },
+      path: "$.balance",
+    },
+    {
+      name: "order book",
+      call: (client) => client.getOrderBook({ assetId: "2", epoch: "3" }),
+      data: { assetId: "2", epoch: "3", ts: "4", seqId: "5", bids: "invalid", asks: [] },
+      path: "$.bids",
+    },
+    {
+      name: "book orders",
+      call: (client) => client.getBookOrders({ assetId: "2", epoch: "3", account: MASTER }),
+      data: { assetId: "2", epoch: "3", ts: "4", seqId: "5", buys: [], sells: "invalid" },
+      path: "$.sells",
+    },
+    {
+      name: "top of book",
+      call: (client) => client.getTopOfBook({ assetId: "2", epoch: "3" }),
+      data: {
+        assetId: "2",
+        epoch: "3",
+        ts: "4",
+        seqId: "5",
+        bid: LEVEL,
+        ask: "invalid",
+        last: "6",
+        lastTs: "7",
+      },
+      path: "$.ask",
+    },
+    {
+      name: "position",
+      call: (client) => client.getPosition({ account: MASTER, assetId: "2", epoch: "3" }),
+      data: {
+        account: MASTER,
+        assetId: "2",
+        epoch: "3",
+        ts: "4",
+        size: "invalid",
+        margin: "1",
+        balance: "1",
+        pnl: "0",
+        side: false,
+        bSide: false,
+        mSide: false,
+        pSide: false,
+      },
+      path: "$.size",
+    },
+    {
+      name: "claimable",
+      call: (client) => client.getClaimable({ account: MASTER, assetId: "2", epoch: "3" }),
+      data: { account: MASTER, assetId: "2", epoch: "3", claimable: "invalid" },
+      path: "$.claimable",
+    },
+    {
+      name: "mark price",
+      call: (client) => client.getMarkPrice("2"),
+      data: { assetId: "2", id: "invalid", ts: "4", price: "5" },
+      path: "$.id",
+    },
+    {
+      name: "settlement price",
+      call: (client) => client.getSettlementPrice({ assetId: "2", epoch: "3" }),
+      data: {
+        assetId: "2",
+        epoch: "3",
+        id: "4",
+        ts: "5",
+        expirationTime: "invalid",
+        settlementPrice: "6",
+      },
+      path: "$.expirationTime",
+    },
+    {
+      name: "agent approval",
+      call: (client) => client.getAgentApproval(MASTER),
+      data: { agent: AGENT, nonce: "4", status: "invalid" },
+      path: "$.status",
+    },
+    {
+      name: "agent approval nonce",
+      call: (client) => client.getAgentApprovalNonce(MASTER),
+      data: { agent: AGENT, nonce: "invalid", status: "active" },
+      path: "$.nonce",
+    },
+    {
+      name: "exchange config",
+      call: (client) => client.getExchangeConfig("31337"),
+      data: exchangeConfig({ chainId: "invalid" }),
+      path: "$.chainId",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const mock = createFetchMock(() => ({ data: testCase.data }));
+    const client = createInfoClient({
+      apiUrl: "http://localhost:3000/api",
+      fetch: mock.fetch,
+    });
+
+    await assert.rejects(
+      () => testCase.call(client),
+      (error) => {
+        assert.ok(error instanceof ProtocolValidationError, testCase.name);
+        assert.equal(error.issues[0]?.path, testCase.path, testCase.name);
+        return true;
+      },
+    );
+  }
+});
+
 test("InfoClient aborts timed out and caller-cancelled requests", async () => {
   const pendingFetch = async (_url, init = {}) =>
     new Promise((_resolve, reject) => {
