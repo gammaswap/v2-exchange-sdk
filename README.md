@@ -54,17 +54,17 @@ import { decodeAssetId, encodeAssetId } from "@gammaswap/v2-exchange-sdk";
 
 const assetId = encodeAssetId(
   "12345678901234567890", // uint64 base asset ID
-  1,                      // market type
-  1_700_000_000,          // start time in Unix seconds
-  900,                    // epoch period: 15 minutes
-  "50000000",            // strike
-  0,                      // range
+  1, // market type
+  1_700_000_000, // start time in Unix seconds
+  900, // epoch period: 15 minutes
+  "50000000", // strike
+  0, // range
 );
 
 const decoded = decodeAssetId(assetId);
-console.log(decoded.id);           // "12345678901234567890"
+console.log(decoded.id); // "12345678901234567890"
 console.log(decoded.periodLength); // 900
-console.log(decoded.expiration);   // startTime + periodLength
+console.log(decoded.expiration); // startTime + periodLength
 ```
 
 `decodeAssetId()` returns the 64-bit `id` as a decimal string, preserving the
@@ -81,9 +81,9 @@ converts a timeframe back to seconds:
 ```ts
 import { getExpirationTf, parseExpirationTf } from "@gammaswap/v2-exchange-sdk";
 
-getExpirationTf(900);       // "15m"
-parseExpirationTf("15m");  // 900
-parseExpirationTf("1h");   // 3600
+getExpirationTf(900); // "15m"
+parseExpirationTf("15m"); // 900
+parseExpirationTf("1h"); // 3600
 ```
 
 Supported units are seconds (`s`), minutes (`m`), hours (`h`), days (`d`),
@@ -174,6 +174,22 @@ const info = createInfoClient({
 - `fetch`: optional replacement for `globalThis.fetch`, useful in tests or
   custom runtimes.
 - `headers`: optional headers added to every request.
+- `timeoutMs`: optional default timeout for HTTP requests. Defaults to 30,000
+  ms; individual calls can override it.
+
+Every HTTP method accepts an optional second `HttpRequestOptions` argument:
+
+```ts
+const controller = new AbortController();
+const balance = await info.getBalance(account, {
+  timeoutMs: 10_000,
+  signal: controller.signal,
+});
+```
+
+Use `signal` to cancel a request from the caller. Timeouts throw
+`HttpTimeoutError`; caller cancellation throws `HttpAbortError`. The same
+request options are supported by `ExchangeClient` action methods.
 
 ### Available functions:
 
@@ -196,24 +212,24 @@ const info = createInfoClient({
 
 ### GET request inputs:
 
-| Function                                 | Route                                    | Input fields                                                                      |
-| ---------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `getHealth()`                            | `GET /health`                            | No input.                                                                         |
-| `getAsset(inputOrAssetId)`               | `GET /asset/:assetId`                    | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
-| `getAssetAtEpoch(input)`                 | `GET /asset/:assetId/:epoch`             | `assetId`: market asset id. `epoch`: requested market epoch.                       |
-| `getResolutionPrice(input)`              | `GET /resolve/:assetId/:epoch`           | `assetId`: market asset id. `epoch`: market epoch.                                |
-| `getLastResolutionPrice(inputOrAssetId)` | `GET /resolve/last/epoch/:assetId`       | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
-| `getBalance(inputOrAccount)`             | `GET /balance/:account`                  | `account`: account address. Accepts `{ account }` or the address directly.        |
-| `getOrderBook(input)`                    | `GET /book/:assetId/:epoch`              | `assetId`: market asset id. `epoch`: market epoch.                                |
-| `getBookOrders(input)`                   | `GET /book/:assetId/:epoch/:account`     | `assetId`: market asset id. `epoch`: market epoch. `account`: account address.    |
-| `getTopOfBook(input)`                    | `GET /book/market/top/:assetId/:epoch`   | `assetId`: market asset id. `epoch`: market epoch.                                |
-| `getPosition(input)`                     | `GET /position/:account/:assetId/:epoch` | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
-| `getClaimable(input)`                    | `GET /claim/:assetId/:epoch/:account`    | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
-| `getMarkPrice(inputOrAssetId)`           | `GET /resolve/mark/:assetId`             | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
-| `getSettlementPrice(input)`              | `GET /resolve/settlement/:assetId/:epoch`| `assetId`: market asset id. `epoch`: market epoch.                                |
-| `getAgentApproval(inputOrAccount)`       | `GET /agents/status/:master`             | `account`: master account address. Accepts `{ account }` or the address directly. |
-| `getAgentApprovalNonce(inputOrAccount)`  | `GET /agents/status/:master`             | Same input as `getAgentApproval`; returns only the parsed approval nonce.         |
-| `getExchangeConfig(inputOrChainId)`      | `GET /config/chains/:chainId`            | `chainId`: exchange chain id. Accepts `{ chainId }` or the chain id directly.     |
+| Function                                 | Route                                     | Input fields                                                                      |
+| ---------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------- |
+| `getHealth()`                            | `GET /health`                             | No input.                                                                         |
+| `getAsset(inputOrAssetId)`               | `GET /asset/:assetId`                     | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getAssetAtEpoch(input)`                 | `GET /asset/:assetId/:epoch`              | `assetId`: market asset id. `epoch`: requested market epoch.                      |
+| `getResolutionPrice(input)`              | `GET /resolve/:assetId/:epoch`            | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getLastResolutionPrice(inputOrAssetId)` | `GET /resolve/last/epoch/:assetId`        | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getBalance(inputOrAccount)`             | `GET /balance/:account`                   | `account`: account address. Accepts `{ account }` or the address directly.        |
+| `getOrderBook(input)`                    | `GET /book/:assetId/:epoch`               | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getBookOrders(input)`                   | `GET /book/:assetId/:epoch/:account`      | `assetId`: market asset id. `epoch`: market epoch. `account`: account address.    |
+| `getTopOfBook(input)`                    | `GET /book/market/top/:assetId/:epoch`    | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getPosition(input)`                     | `GET /position/:account/:assetId/:epoch`  | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
+| `getClaimable(input)`                    | `GET /claim/:assetId/:epoch/:account`     | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
+| `getMarkPrice(inputOrAssetId)`           | `GET /resolve/mark/:assetId`              | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getSettlementPrice(input)`              | `GET /resolve/settlement/:assetId/:epoch` | `assetId`: market asset id. `epoch`: market epoch.                                |
+| `getAgentApproval(inputOrAccount)`       | `GET /agents/status/:master`              | `account`: master account address. Accepts `{ account }` or the address directly. |
+| `getAgentApprovalNonce(inputOrAccount)`  | `GET /agents/status/:master`              | Same input as `getAgentApproval`; returns only the parsed approval nonce.         |
+| `getExchangeConfig(inputOrChainId)`      | `GET /config/chains/:chainId`             | `chainId`: exchange chain id. Accepts `{ chainId }` or the chain id directly.     |
 
 ### Notes:
 
@@ -265,6 +281,8 @@ const exchange = createExchangeClient({
   has no SDK default or when testing custom deployments.
 - `fetch`: optional replacement for `globalThis.fetch`.
 - `headers`: optional headers added to every HTTP request.
+- `timeoutMs`: optional default timeout for HTTP requests. Defaults to 30,000
+  ms; individual calls can override it.
 - `infoClient`: optional `InfoClient` instance. If omitted, the exchange client
   creates one using the same `apiUrl`, `fetch`, and `headers`.
 - `nonceManager`: optional `NonceManager`. If omitted, a local nonce manager is

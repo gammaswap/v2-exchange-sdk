@@ -6,6 +6,8 @@ import {
   createExchangeClient,
   createInfoClient,
   HttpResponseError,
+  HttpAbortError,
+  HttpTimeoutError,
   NonceManager,
   ProtocolValidationError,
 } from "@gammaswap/v2-exchange-sdk";
@@ -621,6 +623,65 @@ test("InfoClient rejects malformed successful informational responses", async ()
       assert.equal(error.issues[0]?.path, "$.balance");
       return true;
     },
+  );
+});
+
+test("InfoClient aborts timed out and caller-cancelled requests", async () => {
+  const pendingFetch = async (_url, init = {}) =>
+    new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+    });
+
+  const client = createInfoClient({
+    apiUrl: "http://localhost:3000",
+    fetch: pendingFetch,
+  });
+
+  await assert.rejects(
+    () => client.getHealth({ timeoutMs: 5 }),
+    (error) => error instanceof HttpTimeoutError && error.timeoutMs === 5,
+  );
+
+  const hangingBodyClient = createInfoClient({
+    apiUrl: "http://localhost:3000",
+    fetch: async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: () => new Promise(() => {}),
+      text: async () => "",
+    }),
+  });
+  await assert.rejects(
+    () => hangingBodyClient.getHealth({ timeoutMs: 5 }),
+    (error) => error instanceof HttpTimeoutError && error.timeoutMs === 5,
+  );
+
+  const controller = new AbortController();
+  const cancelled = client.getHealth({ signal: controller.signal });
+  controller.abort("cancelled by caller");
+
+  await assert.rejects(
+    () => cancelled,
+    (error) => error instanceof HttpAbortError && error.cause === "cancelled by caller",
+  );
+});
+
+test("ExchangeClient applies request timeout options to signed POST requests", async () => {
+  const pendingFetch = async (_url, init = {}) =>
+    new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+    });
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    fetch: pendingFetch,
+  });
+
+  await assert.rejects(
+    () => client.placeOrder(baseOrderInput(), { timeoutMs: 5 }),
+    (error) => error instanceof HttpTimeoutError && error.timeoutMs === 5,
   );
 });
 
