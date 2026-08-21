@@ -828,7 +828,7 @@ export interface OraclePriceSubscriptionHandlers {
  * expiration (not packed) = startTime + periodLength (when the market settles).
  */
 export interface DecodedAssetId {
-    id: number;           // uint64 — base asset id
+    id: string;           // uint64 — base asset id
     marketType: number;   // uint8 — asset type (1 = up/down, etc.)
     startTime: number;    // uint32 — market start timestamp
     periodLength: number; // uint32 — period in seconds (e.g. 900 for 15m)

@@ -33,7 +33,61 @@ import { createOracleWebSocketClient } from "@gammaswap/v2-exchange-sdk/oracle-w
 import { parseUnsignedInteger } from "@gammaswap/v2-exchange-sdk/integer-inputs";
 import { parseAddress } from "@gammaswap/v2-exchange-sdk/string-inputs";
 import { TimeInForce } from "@gammaswap/v2-exchange-sdk/constants";
+import { decodeAssetId } from "@gammaswap/v2-exchange-sdk/assetIdUtils";
 ```
+
+## Asset ID utilities
+
+An exchange `assetId` is a packed `uint256`. It contains the base asset ID,
+market type, start time, epoch period length, strike, range, and reserved bits.
+The utilities in `assetIdUtils` encode and decode this representation without
+floating-point arithmetic. The 64-bit base asset ID and other protocol-sized
+values are represented as `bigint` or decimal strings.
+
+### Encode and decode an asset ID
+
+Use `encodeAssetId()` when constructing an asset ID from its packed fields, and
+`decodeAssetId()` when you need to inspect an existing asset ID:
+
+```ts
+import { decodeAssetId, encodeAssetId } from "@gammaswap/v2-exchange-sdk";
+
+const assetId = encodeAssetId(
+  "12345678901234567890", // uint64 base asset ID
+  1,                      // market type
+  1_700_000_000,          // start time in Unix seconds
+  900,                    // epoch period: 15 minutes
+  "50000000",            // strike
+  0,                      // range
+);
+
+const decoded = decodeAssetId(assetId);
+console.log(decoded.id);           // 12345678901234567890n
+console.log(decoded.periodLength); // 900
+console.log(decoded.expiration);   // startTime + periodLength
+```
+
+`decodeAssetId()` returns `id` as a `bigint`, preserving the full 64-bit value.
+The `strike` and `reserved` fields are returned as decimal strings. The
+function also returns `expiration` as a convenience value; expiration is not
+stored as a separate packed field.
+
+### Convert epoch periods to timeframes
+
+`getExpirationTf()` formats a duration in seconds, while `parseExpirationTf()`
+converts a timeframe back to seconds:
+
+```ts
+import { getExpirationTf, parseExpirationTf } from "@gammaswap/v2-exchange-sdk";
+
+getExpirationTf(900);       // "15m"
+parseExpirationTf("15m");  // 900
+parseExpirationTf("1h");   // 3600
+```
+
+Supported units are seconds (`s`), minutes (`m`), hours (`h`), days (`d`),
+weeks (`w`), months (`M`), and years (`y`). Timeframe values must be positive
+whole numbers.
 
 ## Input Units
 
