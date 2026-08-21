@@ -619,4 +619,12 @@ pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
+pnpm validate:package
 ```
+
+`pnpm validate:package` inspects the package contents with the available pack
+dry-run command (`pnpm pack --dry-run`, or `npm pack --dry-run` when the
+installed pnpm version does not support that option), creates the actual
+publishable tarball with pnpm, installs it into a temporary consumer project,
+and tests the package root and public subpath imports from that packed
+artifact.

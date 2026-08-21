@@ -94,6 +94,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "validate:package": "pnpm build && node scripts/validate-package.mjs",
     "clean": "rm -rf dist",
     "api:asset": "tsx scripts/api/getAsset.ts",
     "api:balance": "tsx scripts/api/getBalance.ts",
