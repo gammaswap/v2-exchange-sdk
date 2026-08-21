@@ -175,11 +175,12 @@
     "@eslint/js": "^9.0.0",
     "@types/node": "^24.10.1",
     "@types/ws": "^8.18.1",
+    "axios": "^1.19.0",
     "dotenv": "^17.4.2",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "tsx": "^4.20.3",
-    "typescript-eslint": "^8.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.0.0"
   }
 }
