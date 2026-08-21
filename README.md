@@ -628,3 +628,10 @@ installed pnpm version does not support that option), creates the actual
 publishable tarball with pnpm, installs it into a temporary consumer project,
 and tests the package root and public subpath imports from that packed
 artifact.
+
+### Release validation
+
+CI runs the build, tests, typecheck, lint, formatting check, and packed-package
+validation. The packed-package check installs the generated tarball into a
+temporary consumer project and verifies the package root and public subpath
+imports before publishing.
