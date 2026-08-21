@@ -176,7 +176,9 @@ const info = createInfoClient({
 
 ### Available functions:
 
+- `getHealth()`
 - `getAsset(inputOrAssetId)`
+- `getAssetAtEpoch(input)`
 - `getResolutionPrice(input)`
 - `getLastResolutionPrice(inputOrAssetId)`
 - `getBalance(inputOrAccount)`
@@ -184,6 +186,9 @@ const info = createInfoClient({
 - `getBookOrders(input)`
 - `getTopOfBook(input)`
 - `getPosition(input)`
+- `getClaimable(input)`
+- `getMarkPrice(inputOrAssetId)`
+- `getSettlementPrice(input)`
 - `getAgentApproval(inputOrAccount)`
 - `getAgentApprovalNonce(inputOrAccount)`
 - `getExchangeConfig(inputOrChainId)`
@@ -207,6 +212,11 @@ const info = createInfoClient({
 ### Notes:
 
 - This client does not sign messages and does not need a wallet.
+- Successful informational responses are validated against the API response
+  schemas. Protocol numeric fields are returned as `bigint`; timestamps and
+  sequence IDs are also converted to `bigint` to avoid precision loss.
+- HTTP errors remain `HttpResponseError` instances and preserve the API's raw
+  error payload in `error.data`.
 - `apiUrl` is normalized with a trailing slash internally.
 - `getExchangeConfig()` fetches configured contract addresses from the API, but
   the SDK also has hard-coded defaults for supported chain IDs.

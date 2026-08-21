@@ -46,6 +46,17 @@ import {
   getAssetRequestSchema,
   getAssetAtEpochRequestSchema,
   parseAssetSnapshot,
+  parseAgentApprovalResponse,
+  parseBalanceResponse,
+  parseBookOrdersResponse,
+  parseClaimableResponse,
+  parseHealthResponse,
+  parseMarkPriceResponse,
+  parseOrderBookResponse,
+  parsePositionResponse,
+  parseResolutionPriceResponse,
+  parseSettlementPriceResponse,
+  parseTopOfBookResponse,
   getBalanceRequestSchema,
   getBookOrdersRequestSchema,
   getExchangeConfigRequestSchema,
@@ -85,6 +96,17 @@ import type {
   GetTopOfBookRequest,
   JsonExchangeChainConfig,
   AssetSnapshot,
+  AgentApprovalResponse,
+  BalanceResponse,
+  BookOrdersResponse,
+  ClaimableResponse,
+  HealthResponse,
+  MarkPriceResponse,
+  OrderBookResponse,
+  PositionResponse,
+  ResolutionPriceResponse,
+  SettlementPriceResponse,
+  TopOfBookResponse,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
   JsonSignedCancelReplaceMessage,
@@ -181,8 +203,9 @@ export class InfoClient {
     this.headers = options.headers ?? {};
   }
 
-  async getHealth(): Promise<HttpResult> {
-    return this.get("/health");
+  async getHealth(): Promise<HttpResult<HealthResponse>> {
+    const response = await this.get("/health");
+    return { ...response, data: parseHealthResponse(response.data) };
   }
 
   async getAsset(
@@ -205,95 +228,122 @@ export class InfoClient {
     return { ...response, data: parseAssetSnapshot(response.data) };
   }
 
-  async getResolutionPrice(input: ProtocolInput<GetResolutionPriceRequest>): Promise<HttpResult> {
+  async getResolutionPrice(
+    input: ProtocolInput<GetResolutionPriceRequest>,
+  ): Promise<HttpResult<ResolutionPriceResponse>> {
     const request = getResolutionPriceRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/resolve/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
     );
+    return { ...response, data: parseResolutionPriceResponse(response.data) };
   }
 
   async getLastResolutionPrice(
     input: ProtocolInput<GetLastResolutionPriceRequest> | ProtocolBigNumberish,
-  ): Promise<HttpResult> {
+  ): Promise<HttpResult<ResolutionPriceResponse>> {
     const request = getLastResolutionPriceRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
-    return this.get(`/resolve/last/epoch/${encodePathSegment(request.assetId)}`);
+    const response = await this.get(`/resolve/last/epoch/${encodePathSegment(request.assetId)}`);
+    return { ...response, data: parseResolutionPriceResponse(response.data) };
   }
 
-  async getBalance(input: ProtocolInput<GetBalanceRequest> | Address): Promise<HttpResult> {
+  async getBalance(
+    input: ProtocolInput<GetBalanceRequest> | Address,
+  ): Promise<HttpResult<BalanceResponse>> {
     const request = getBalanceRequestSchema.parse(
       typeof input === "string" ? { account: input } : input,
     );
-    return this.get(`/balance/${encodePathSegment(request.account)}`);
+    const response = await this.get(`/balance/${encodePathSegment(request.account)}`);
+    return { ...response, data: parseBalanceResponse(response.data) };
   }
 
-  async getOrderBook(input: ProtocolInput<GetOrderBookRequest>): Promise<HttpResult> {
+  async getOrderBook(
+    input: ProtocolInput<GetOrderBookRequest>,
+  ): Promise<HttpResult<OrderBookResponse>> {
     const request = getOrderBookRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
     );
+    return { ...response, data: parseOrderBookResponse(response.data) };
   }
 
-  async getBookOrders(input: ProtocolInput<GetBookOrdersRequest>): Promise<HttpResult> {
+  async getBookOrders(
+    input: ProtocolInput<GetBookOrdersRequest>,
+  ): Promise<HttpResult<BookOrdersResponse>> {
     const request = getBookOrdersRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/${encodePathSegment(request.assetId)}/${encodePathSegment(
         request.epoch,
       )}/${encodePathSegment(request.account)}`,
     );
+    return { ...response, data: parseBookOrdersResponse(response.data) };
   }
 
-  async getTopOfBook(input: ProtocolInput<GetTopOfBookRequest>): Promise<HttpResult> {
+  async getTopOfBook(
+    input: ProtocolInput<GetTopOfBookRequest>,
+  ): Promise<HttpResult<TopOfBookResponse>> {
     const request = getTopOfBookRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/market/top/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
     );
+    return { ...response, data: parseTopOfBookResponse(response.data) };
   }
 
-  async getPosition(input: ProtocolInput<GetPositionRequest>): Promise<HttpResult> {
+  async getPosition(
+    input: ProtocolInput<GetPositionRequest>,
+  ): Promise<HttpResult<PositionResponse>> {
     const request = getPositionRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/position/${encodePathSegment(request.account)}/${encodePathSegment(
         request.assetId,
       )}/${encodePathSegment(request.epoch)}`,
     );
+    return { ...response, data: parsePositionResponse(response.data) };
   }
 
-  async getClaimable(input: ProtocolInput<GetClaimableRequest>): Promise<HttpResult> {
+  async getClaimable(
+    input: ProtocolInput<GetClaimableRequest>,
+  ): Promise<HttpResult<ClaimableResponse>> {
     const request = getClaimableRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/claim/${encodePathSegment(request.assetId)}/${encodePathSegment(
         request.epoch,
       )}/${encodePathSegment(request.account)}`,
     );
+    return { ...response, data: parseClaimableResponse(response.data) };
   }
 
   async getMarkPrice(
     input: ProtocolInput<GetMarkPriceRequest> | ProtocolBigNumberish,
-  ): Promise<HttpResult> {
+  ): Promise<HttpResult<MarkPriceResponse>> {
     const request = getMarkPriceRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
-    return this.get(`/resolve/mark/${encodePathSegment(request.assetId)}`);
+    const response = await this.get(`/resolve/mark/${encodePathSegment(request.assetId)}`);
+    return { ...response, data: parseMarkPriceResponse(response.data) };
   }
 
-  async getSettlementPrice(input: ProtocolInput<GetSettlementPriceRequest>): Promise<HttpResult> {
+  async getSettlementPrice(
+    input: ProtocolInput<GetSettlementPriceRequest>,
+  ): Promise<HttpResult<SettlementPriceResponse>> {
     const request = getSettlementPriceRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/resolve/settlement/${encodePathSegment(request.assetId)}/${encodePathSegment(
         request.epoch,
       )}`,
     );
+    return { ...response, data: parseSettlementPriceResponse(response.data) };
   }
 
   async getAgentApproval(
     input: ProtocolInput<GetAgentApprovalRequest> | Address,
-  ): Promise<HttpResult> {
+  ): Promise<HttpResult<AgentApprovalResponse>> {
     const request = getAgentApprovalRequestSchema.parse(
       typeof input === "string" ? { account: input } : input,
     );
-    return this.get(`/agents/status/${encodePathSegment(request.account)}`);
+    const response = await this.get(`/agents/status/${encodePathSegment(request.account)}`);
+    return { ...response, data: parseAgentApprovalResponse(response.data) };
   }
 
   async getAgentApprovalNonce(

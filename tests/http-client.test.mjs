@@ -87,6 +87,84 @@ function assetSnapshot(overrides = {}) {
   };
 }
 
+const LEVEL = {
+  price: "50000000",
+  size: "1000000",
+  orderCount: 1,
+  orders: [{ id: `0x${"11".repeat(32)}`, size: "1000000", price: "50000000" }],
+};
+
+function infoResponse(pathname) {
+  if (pathname === "/api/health") return { status: "ok" };
+  if (pathname === "/api/balance/" + MASTER) {
+    return { account: MASTER, ts: 1700000000, balance: "1000000", pending: "0" };
+  }
+  if (pathname === "/api/position/" + MASTER + "/2/3") {
+    return {
+      account: MASTER,
+      assetId: "2",
+      epoch: "3",
+      ts: 1700000000,
+      size: "1000000",
+      margin: "1000000",
+      balance: "1000000",
+      pnl: "0",
+      side: false,
+      bSide: false,
+      mSide: false,
+      pSide: false,
+    };
+  }
+  if (pathname === "/api/book/2/3") {
+    return { assetId: "2", epoch: "3", ts: 1700000000, seqId: 1, bids: [LEVEL], asks: [] };
+  }
+  if (pathname === "/api/book/2/3/" + MASTER) {
+    return {
+      assetId: "2",
+      epoch: "3",
+      ts: 1700000000,
+      seqId: 1,
+      buys: [LEVEL.orders[0]],
+      sells: [],
+    };
+  }
+  if (pathname === "/api/book/market/top/2/3") {
+    return {
+      assetId: "2",
+      epoch: "3",
+      ts: 1700000000,
+      seqId: 1,
+      bid: LEVEL,
+      ask: LEVEL,
+      last: "50000000",
+      lastTs: "1700000000",
+    };
+  }
+  if (pathname === "/api/claim/2/3/" + MASTER) {
+    return { account: MASTER, assetId: "2", epoch: "3", claimable: "1000000" };
+  }
+  if (pathname === "/api/resolve/mark/2") {
+    return { assetId: "2", id: 2, ts: "1700000000", price: "50000000" };
+  }
+  if (pathname === "/api/resolve/settlement/2/3") {
+    return {
+      assetId: "2",
+      epoch: "3",
+      id: 2,
+      ts: 1700000000,
+      expirationTime: 1700000000,
+      settlementPrice: "50000000",
+    };
+  }
+  if (pathname === "/api/resolve/2/3" || pathname === "/api/resolve/last/epoch/2") {
+    return { assetId: "2", epoch: "3", id: 2, ts: "1700000000", price: "50000000", isNull: false };
+  }
+  if (pathname === "/api/agents/status/" + MASTER) {
+    return { agent: AGENT, nonce: AGENT_APPROVAL_NONCE, status: "active" };
+  }
+  return { ok: true };
+}
+
 function baseOrderInput(overrides = {}) {
   return {
     nonce: "1",
@@ -194,7 +272,7 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
       return { data: assetSnapshot({ assetId: "2", epoch: "3" }) };
     }
 
-    return { data: { ok: true } };
+    return { data: infoResponse(new URL(call.url).pathname) };
   });
   const client = createInfoClient({
     apiUrl: "http://localhost:3000/api",
@@ -206,7 +284,7 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
   const historicalAsset = await client.getAssetAtEpoch({ assetId: "2", epoch: "3" });
   await client.getResolutionPrice({ assetId: "2", epoch: "3" });
   await client.getLastResolutionPrice("2");
-  await client.getBalance(MASTER);
+  const balance = await client.getBalance(MASTER);
   await client.getOrderBook({ assetId: "2", epoch: "3" });
   await client.getBookOrders({ assetId: "2", epoch: "3", account: MASTER });
   await client.getTopOfBook({ assetId: "2", epoch: "3" });
@@ -220,6 +298,8 @@ test("InfoClient implements the GET routes used by src/test examples", async () 
   assert.deepEqual(config.data, exchangeConfig());
   assert.equal(historicalAsset.data.epoch, 3n);
   assert.equal(historicalAsset.data.resolutionPrice, 0n);
+  assert.equal(balance.data.balance, 1000000n);
+  assert.equal(balance.data.ts, 1700000000n);
 
   assert.deepEqual(
     mock.calls.map((call) => call.url),
@@ -351,7 +431,7 @@ test("ExchangeClient placeOrder uses its nonce manager when nonce is omitted", a
 test("ExchangeClient signs and posts regular and agent cancel-replace actions", async () => {
   const mock = createFetchMock((call) => {
     if (call.init.method === "GET") {
-      return { data: { nonce: AGENT_APPROVAL_NONCE } };
+      return { data: { agent: AGENT, nonce: AGENT_APPROVAL_NONCE, status: "active" } };
     }
     return { data: { accepted: true } };
   });
@@ -470,7 +550,7 @@ test("ExchangeClient uses hard-coded localhost contracts when no contracts are p
 test("ExchangeClient agent actions fetch approval nonce and sign as the agent", async () => {
   const mock = createFetchMock((call) => {
     if (call.init.method === "GET") {
-      return { data: { nonce: AGENT_APPROVAL_NONCE } };
+      return { data: { agent: AGENT, nonce: AGENT_APPROVAL_NONCE, status: "active" } };
     }
     return { data: { accepted: true } };
   });
@@ -518,6 +598,30 @@ test("InfoClient rejects invalid request fields before sending", async () => {
 
   await assert.rejects(() => client.getAsset(1), ProtocolValidationError);
   assert.equal(mock.calls.length, 0);
+});
+
+test("InfoClient rejects malformed successful informational responses", async () => {
+  const mock = createFetchMock(() => ({
+    data: {
+      account: MASTER,
+      ts: "1700000000",
+      balance: "not-an-integer",
+      pending: "0",
+    },
+  }));
+  const client = createInfoClient({
+    apiUrl: "http://localhost:3000",
+    fetch: mock.fetch,
+  });
+
+  await assert.rejects(
+    () => client.getBalance(MASTER),
+    (error) => {
+      assert.ok(error instanceof ProtocolValidationError);
+      assert.equal(error.issues[0]?.path, "$.balance");
+      return true;
+    },
+  );
 });
 
 test("ExchangeClient rejects invalid signed action fields before posting", async () => {
