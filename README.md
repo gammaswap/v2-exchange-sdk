@@ -62,15 +62,16 @@ const assetId = encodeAssetId(
 );
 
 const decoded = decodeAssetId(assetId);
-console.log(decoded.id);           // 12345678901234567890n
+console.log(decoded.id);           // "12345678901234567890"
 console.log(decoded.periodLength); // 900
 console.log(decoded.expiration);   // startTime + periodLength
 ```
 
-`decodeAssetId()` returns `id` as a `bigint`, preserving the full 64-bit value.
-The `strike` and `reserved` fields are returned as decimal strings. The
-function also returns `expiration` as a convenience value; expiration is not
-stored as a separate packed field.
+`decodeAssetId()` returns the 64-bit `id` as a decimal string, preserving the
+full value without JavaScript number precision loss. The `strike` and
+`reserved` fields are also returned as decimal strings. The function returns
+`expiration` as a convenience value; expiration is not stored as a separate
+packed field.
 
 ### Convert epoch periods to timeframes
 
@@ -197,7 +198,9 @@ const info = createInfoClient({
 
 | Function                                 | Route                                    | Input fields                                                                      |
 | ---------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| `getHealth()`                            | `GET /health`                            | No input.                                                                         |
 | `getAsset(inputOrAssetId)`               | `GET /asset/:assetId`                    | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getAssetAtEpoch(input)`                 | `GET /asset/:assetId/:epoch`             | `assetId`: market asset id. `epoch`: requested market epoch.                       |
 | `getResolutionPrice(input)`              | `GET /resolve/:assetId/:epoch`           | `assetId`: market asset id. `epoch`: market epoch.                                |
 | `getLastResolutionPrice(inputOrAssetId)` | `GET /resolve/last/epoch/:assetId`       | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
 | `getBalance(inputOrAccount)`             | `GET /balance/:account`                  | `account`: account address. Accepts `{ account }` or the address directly.        |
@@ -205,6 +208,9 @@ const info = createInfoClient({
 | `getBookOrders(input)`                   | `GET /book/:assetId/:epoch/:account`     | `assetId`: market asset id. `epoch`: market epoch. `account`: account address.    |
 | `getTopOfBook(input)`                    | `GET /book/market/top/:assetId/:epoch`   | `assetId`: market asset id. `epoch`: market epoch.                                |
 | `getPosition(input)`                     | `GET /position/:account/:assetId/:epoch` | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
+| `getClaimable(input)`                    | `GET /claim/:assetId/:epoch/:account`    | `account`: account address. `assetId`: market asset id. `epoch`: market epoch.    |
+| `getMarkPrice(inputOrAssetId)`           | `GET /resolve/mark/:assetId`             | `assetId`: market asset id. Accepts `{ assetId }` or the asset id directly.       |
+| `getSettlementPrice(input)`              | `GET /resolve/settlement/:assetId/:epoch`| `assetId`: market asset id. `epoch`: market epoch.                                |
 | `getAgentApproval(inputOrAccount)`       | `GET /agents/status/:master`             | `account`: master account address. Accepts `{ account }` or the address directly. |
 | `getAgentApprovalNonce(inputOrAccount)`  | `GET /agents/status/:master`             | Same input as `getAgentApproval`; returns only the parsed approval nonce.         |
 | `getExchangeConfig(inputOrChainId)`      | `GET /config/chains/:chainId`            | `chainId`: exchange chain id. Accepts `{ chainId }` or the chain id directly.     |
@@ -220,10 +226,16 @@ const info = createInfoClient({
 - `apiUrl` is normalized with a trailing slash internally.
 - `getExchangeConfig()` fetches configured contract addresses from the API, but
   the SDK also has hard-coded defaults for supported chain IDs.
+- `getAsset(inputOrAssetId)` reads the current asset state from the latest
+  exchange epoch, including its current strike price, resolution price,
+  resolution status, and expiration.
+- `getAssetAtEpoch({ assetId, epoch })` reads the state for the explicitly
+  requested epoch, including that epoch's strike price, resolution price, and
+  expiration.
 - `getResolutionPrice({ assetId, epoch })` fetches the resolution price for a
-  specific asset and epoch from `/resolve/:assetId/:epoch`. It requires an input
-  object because it has two fields, matching the multi-field request style used
-  by `getOrderBook()`, `getBookOrders()`, `getTopOfBook()`, and `getPosition()`.
+  specific asset and epoch from `/resolve/:assetId/:epoch`. It remains available
+  for compatibility and for consumers that need the standalone resolution
+  response. It requires an input object because it has two fields.
 - `getLastResolutionPrice(inputOrAssetId)` fetches the latest resolution price
   for an asset from `/resolve/last/epoch/:assetId`. Like other single-field
   read calls, it accepts either `{ assetId }` or the asset ID directly.
@@ -546,23 +558,33 @@ the relevant client, and make the API call or transaction directly in each file.
 Common commands:
 
 ```sh
+pnpm sample:health
 pnpm sample:asset
+pnpm sample:asset-at-epoch
+pnpm sample:asset-id
 pnpm sample:balance
 pnpm sample:book
 pnpm sample:book-orders
 pnpm sample:book-top
 pnpm sample:resolution
 pnpm sample:last-resolution
+pnpm sample:claimable
+pnpm sample:mark-price
+pnpm sample:settlement-price
 pnpm sample:order
 pnpm sample:cancel
 pnpm sample:cancel-replace
 pnpm sample:deposit
 pnpm sample:withdrawal
+pnpm sample:agent:approve
+pnpm sample:agent:revoke
+pnpm sample:agent:status
 pnpm sample:agent:order
 pnpm sample:agent:cancel
 pnpm sample:agent:cancel-replace
 pnpm sample:agent:claim
-pnpm sample:ws
+pnpm sample:ws:book
+pnpm sample:ws:oracle
 ```
 
 The older direct API examples live in `scripts/api`.
