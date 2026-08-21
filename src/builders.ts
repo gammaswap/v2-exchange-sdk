@@ -179,7 +179,7 @@ export function buildOnchainDeposit(input: BuildOnchainDepositInput): Eip712Onch
 }
 
 export function buildAgentApproval(input: BuildAgentApprovalInput): Eip712AgentApproval {
-  return parseEip712AgentApproval({...input, approvalSignature: "0x"});
+  return parseEip712AgentApproval({ ...input, approvalSignature: "0x" });
 }
 
 export interface BuildSignedOrderMessageInput extends Omit<
@@ -196,8 +196,10 @@ export interface BuildSignedCancelMessageInput extends Omit<
   cancel: Eip712CancelInput;
 }
 
-export interface BuildSignedCancelReplaceMessageInput
-  extends Omit<ProtocolInput<SignedCancelReplaceMessage>, "cancelReplace" | "replacement"> {
+export interface BuildSignedCancelReplaceMessageInput extends Omit<
+  ProtocolInput<SignedCancelReplaceMessage>,
+  "cancelReplace" | "replacement"
+> {
   cancelReplace: Eip712CancelReplaceInput;
   replacement: Eip712OrderInput;
 }

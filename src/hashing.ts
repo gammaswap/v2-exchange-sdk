@@ -1,41 +1,41 @@
 import { AbiCoder, keccak256, solidityPacked, type TypedDataDomain } from "ethers";
 import {
-    CancelEntry,
-    ClaimEntry,
-    DepositEntry,
-    Eip712AgentApproval,
-    Eip712ApproveAgent,
-    Eip712Cancel,
-    Eip712CancelReplace,
-    Eip712Claim,
-    Eip712Deposit,
-    Eip712Invalidate,
-    Eip712OnchainDeposit,
-    Eip712Order,
-    Eip712Pause,
-    Eip712Resolution,
-    Eip712RevokeAgent,
-    Eip712Withdrawal,
-    FillEntry,
-    OnchainDepositEntry,
-    PauseEntry,
-    ResolutionEntry,
-    WithdrawalEntry,
+  CancelEntry,
+  ClaimEntry,
+  DepositEntry,
+  Eip712AgentApproval,
+  Eip712ApproveAgent,
+  Eip712Cancel,
+  Eip712CancelReplace,
+  Eip712Claim,
+  Eip712Deposit,
+  Eip712Invalidate,
+  Eip712OnchainDeposit,
+  Eip712Order,
+  Eip712Pause,
+  Eip712Resolution,
+  Eip712RevokeAgent,
+  Eip712Withdrawal,
+  FillEntry,
+  OnchainDepositEntry,
+  PauseEntry,
+  ResolutionEntry,
+  WithdrawalEntry,
 } from "./types.js";
 import {
-    AGENT_APPROVAL_TYPEHASH,
-    APPROVE_AGENT_ORDER_TYPEHASH,
-    CANCEL_ORDER_TYPEHASH,
-    CANCEL_REPLACE_ORDER_TYPEHASH,
-    CLAIM_ORDER_TYPEHASH,
-    DEPOSIT_ORDER_TYPEHASH,
-    DEPOSIT_SWEEP_ORDER_TYPEHASH,
-    FILL_ORDER_TYPEHASH,
-    INVALIDATE_ORDER_TYPEHASH,
-    PAUSE_ORDER_TYPEHASH,
-    RESOLUTION_ORDER_TYPEHASH,
-    REVOKE_AGENT_ORDER_TYPEHASH,
-    WITHDRAWAL_ORDER_TYPEHASH,
+  AGENT_APPROVAL_TYPEHASH,
+  APPROVE_AGENT_ORDER_TYPEHASH,
+  CANCEL_ORDER_TYPEHASH,
+  CANCEL_REPLACE_ORDER_TYPEHASH,
+  CLAIM_ORDER_TYPEHASH,
+  DEPOSIT_ORDER_TYPEHASH,
+  DEPOSIT_SWEEP_ORDER_TYPEHASH,
+  FILL_ORDER_TYPEHASH,
+  INVALIDATE_ORDER_TYPEHASH,
+  PAUSE_ORDER_TYPEHASH,
+  RESOLUTION_ORDER_TYPEHASH,
+  REVOKE_AGENT_ORDER_TYPEHASH,
+  WITHDRAWAL_ORDER_TYPEHASH,
 } from "./constants.js";
 
 export const CHAIN_ID = BigInt(process.env.CHAIN_ID || "31337");
@@ -466,37 +466,39 @@ function getCancelStructHash(order: Eip712Cancel): string {
   );
 }
 
-function getCancelReplaceStructHash(order: Eip712CancelReplace) : string {
-    return keccak256(abi.encode(
-        [
-            "bytes32",
-            "uint8",   // typ
-            "uint64",  // nonce
-            "address", // signer
-            "uint8",   // signatureType
-            "address", // sender
-            "uint256", // assetId
-            "uint32",  // epoch
-            "bytes32", // cancelOrderHash
-            "bytes32", // replacementOrderHash
-            "uint32",  // approvalNonce
-            "bool",    // allOrNothing
-        ],
-        [
-            CANCEL_REPLACE_ORDER_TYPEHASH,
-            order.typ,
-            order.nonce,
-            order.signer,
-            order.signatureType,
-            order.sender,
-            order.assetId,
-            order.epoch,
-            order.cancelOrderHash,
-            order.replacementOrderHash,
-            order.approvalNonce,
-            order.allOrNothing,
-        ]
-    ));
+function getCancelReplaceStructHash(order: Eip712CancelReplace): string {
+  return keccak256(
+    abi.encode(
+      [
+        "bytes32",
+        "uint8", // typ
+        "uint64", // nonce
+        "address", // signer
+        "uint8", // signatureType
+        "address", // sender
+        "uint256", // assetId
+        "uint32", // epoch
+        "bytes32", // cancelOrderHash
+        "bytes32", // replacementOrderHash
+        "uint32", // approvalNonce
+        "bool", // allOrNothing
+      ],
+      [
+        CANCEL_REPLACE_ORDER_TYPEHASH,
+        order.typ,
+        order.nonce,
+        order.signer,
+        order.signatureType,
+        order.sender,
+        order.assetId,
+        order.epoch,
+        order.cancelOrderHash,
+        order.replacementOrderHash,
+        order.approvalNonce,
+        order.allOrNothing,
+      ],
+    ),
+  );
 }
 
 function getClaimEntryStructHash(order: ClaimEntry): string {

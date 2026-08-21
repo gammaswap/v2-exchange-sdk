@@ -25,19 +25,19 @@ https://exchange-api.gammaswap.com/api
 - `side` is a boolean order direction: `false` means buy, `true` means sell.
 - `timeInForce` can be passed as a string or number-like value and is normalized to:
 
-| Value | Name | Meaning |
-| --- | --- | --- |
-| `0` | `GTC` | Good until cancelled. |
-| `1` | `FOK` | Fill or kill. |
-| `2` | `IOC` | Immediate or cancel. |
-| `3` | `ALO` | Add liquidity only. |
+| Value | Name  | Meaning               |
+| ----- | ----- | --------------------- |
+| `0`   | `GTC` | Good until cancelled. |
+| `1`   | `FOK` | Fill or kill.         |
+| `2`   | `IOC` | Immediate or cancel.  |
+| `3`   | `ALO` | Add liquidity only.   |
 
 - `signatureType` values used by this package are:
 
-| Value | Name | Meaning |
-| --- | --- | --- |
-| `0` | `EOA` | The sender signs directly. |
-| `4` | `AGENT` | An approved agent signs for the sender. |
+| Value | Name    | Meaning                                 |
+| ----- | ------- | --------------------------------------- |
+| `0`   | `EOA`   | The sender signs directly.              |
+| `4`   | `AGENT` | An approved agent signs for the sender. |
 
 ### Authentication
 
@@ -270,8 +270,8 @@ No path parameters, query parameters, or body.
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field    | Type   | Description                             |
+| -------- | ------ | --------------------------------------- |
 | `status` | string | Always `ok` when the server is healthy. |
 
 Example:
@@ -314,6 +314,7 @@ Returns the current balance snapshot for an account.
     "message": "Timed out waiting for BALANCE response from relayer"
   }
   ```
+
 - `404 BALANCE_NOT_FOUND` if no balance snapshot is available.
 - `500 INTERNAL_ERROR` for unexpected failures.
 
@@ -375,17 +376,17 @@ Returns registered asset metadata for the latest/current asset state.
 
 #### Response: 200
 
-| Field | Type | Description                                               |
-| --- | --- |-----------------------------------------------------------|
-| `assetId` | string | Market asset id from the request.                         |
-| `epoch` | string | Current asset epoch (starts at epoch 0).                  |
-| `registered` | boolean | Whether the asset is registered.                          |
-| `expiration` | string | Current expiration timestamp in unix seconds.             |
-| `assetType` | string | Asset type id (1 = single epoch, 2 = recurring epoch).    |
-| `strikePrice` | string | Strike price for the current asset epoch (price to beat). |
-| `resolutionPrice` | string | Resolution price for the current asset epoch, or `0` when unresolved. |
-| `isResolved` | boolean | Whether the current asset epoch has been resolved. |
-| `ledger` | address | Ledger contract address associated with the asset.        |
+| Field             | Type    | Description                                                           |
+| ----------------- | ------- | --------------------------------------------------------------------- |
+| `assetId`         | string  | Market asset id from the request.                                     |
+| `epoch`           | string  | Current asset epoch (starts at epoch 0).                              |
+| `registered`      | boolean | Whether the asset is registered.                                      |
+| `expiration`      | string  | Current expiration timestamp in unix seconds.                         |
+| `assetType`       | string  | Asset type id (1 = single epoch, 2 = recurring epoch).                |
+| `strikePrice`     | string  | Strike price for the current asset epoch (price to beat).             |
+| `resolutionPrice` | string  | Resolution price for the current asset epoch, or `0` when unresolved. |
+| `isResolved`      | boolean | Whether the current asset epoch has been resolved.                    |
+| `ledger`          | address | Ledger contract address associated with the asset.                    |
 
 #### Errors
 
@@ -401,24 +402,24 @@ Returns epoch-specific asset data.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `epoch`   | string | Market epoch.    |
 
 #### Response: 200
 
-| Field | Type | Description                                                    |
-| --- | --- |----------------------------------------------------------------|
-| `assetId` | string | Market asset id from the request.                              |
-| `epoch` | string | Market epoch from the request.                                 |
-| `expiration` | string | Expiration timestamp for this asset epoch.                     |
-| `strikePrice` | string | Strike price for this asset epoch (price to beat).             |
-| `resolutionPrice` | string | Resolution price for this asset epoch, or `0` when unresolved. |
-| `registered` | boolean | Whether the asset is registered.                               |
-| `assetType` | string | Asset type id (1 = single epoch, 2 = recurring epoch).        |
-| `isResolved` | boolean | Whether this asset epoch has been resolved.                   |
-| `ledger` | address | Ledger contract address associated with the asset.             |
+| Field             | Type    | Description                                                    |
+| ----------------- | ------- | -------------------------------------------------------------- |
+| `assetId`         | string  | Market asset id from the request.                              |
+| `epoch`           | string  | Market epoch from the request.                                 |
+| `expiration`      | string  | Expiration timestamp for this asset epoch.                     |
+| `strikePrice`     | string  | Strike price for this asset epoch (price to beat).             |
+| `resolutionPrice` | string  | Resolution price for this asset epoch, or `0` when unresolved. |
+| `registered`      | boolean | Whether the asset is registered.                               |
+| `assetType`       | string  | Asset type id (1 = single epoch, 2 = recurring epoch).         |
+| `isResolved`      | boolean | Whether this asset epoch has been resolved.                    |
+| `ledger`          | address | Ledger contract address associated with the asset.             |
 
 #### Errors
 
@@ -772,20 +773,20 @@ Returns the amount claimable by an account for a resolved asset epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| Field     | Type    | Description               |
+| --------- | ------- | ------------------------- |
+| `assetId` | string  | Market asset id.          |
+| `epoch`   | string  | Market epoch.             |
 | `account` | address | Account address to query. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `account` | address | Account address from the request. |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `claimable` | string | Claimable amount. |
+| Field       | Type    | Description                       |
+| ----------- | ------- | --------------------------------- |
+| `account`   | address | Account address from the request. |
+| `assetId`   | string  | Market asset id from the request. |
+| `epoch`     | string  | Market epoch from the request.    |
+| `claimable` | string  | Claimable amount.                 |
 
 #### Errors
 
@@ -858,18 +859,18 @@ Returns the current oracle mark price for the decoded base asset id.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description                       |
+| --------- | ------ | --------------------------------- |
 | `assetId` | string | Market asset id from the request. |
-| `id` | number | Decoded base asset id. |
-| `ts` | string | Current timestamp. |
-| `price` | string | Current oracle price. |
+| `id`      | number | Decoded base asset id.            |
+| `ts`      | string | Current timestamp.                |
+| `price`   | string | Current oracle price.             |
 
 #### Errors
 
@@ -886,21 +887,21 @@ Returns the settlement price for an expired and resolved asset epoch.
 
 #### Path Parameters
 
-| Field | Type | Description |
-| --- | --- | --- |
+| Field     | Type   | Description      |
+| --------- | ------ | ---------------- |
 | `assetId` | string | Market asset id. |
-| `epoch` | string | Market epoch. |
+| `epoch`   | string | Market epoch.    |
 
 #### Response: 200
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `assetId` | string | Market asset id from the request. |
-| `epoch` | string | Market epoch from the request. |
-| `id` | number | Decoded base asset id. |
-| `ts` | number | Current timestamp. |
-| `expirationTime` | number | Expiration timestamp for the asset epoch. |
-| `settlementPrice` | string | Settlement price. |
+| Field             | Type   | Description                               |
+| ----------------- | ------ | ----------------------------------------- |
+| `assetId`         | string | Market asset id from the request.         |
+| `epoch`           | string | Market epoch from the request.            |
+| `id`              | number | Decoded base asset id.                    |
+| `ts`              | number | Current timestamp.                        |
+| `expirationTime`  | number | Expiration timestamp for the asset epoch. |
+| `settlementPrice` | string | Settlement price.                         |
 
 #### Errors
 

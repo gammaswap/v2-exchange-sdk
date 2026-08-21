@@ -72,9 +72,11 @@ export const CANCEL_ORDER_TYPEHASH = keccak256(
   ),
 );
 
-export const CANCEL_REPLACE_ORDER_TYPEHASH = keccak256(Buffer.from(
-    "CancelReplaceOrder(uint8 typ,uint64 nonce,address signer,uint8 signatureType,address sender,uint256 assetId,uint32 epoch,bytes32 cancelOrderHash,bytes32 replacementOrderHash,uint32 approvalNonce,bool allOrNothing)"
-));
+export const CANCEL_REPLACE_ORDER_TYPEHASH = keccak256(
+  Buffer.from(
+    "CancelReplaceOrder(uint8 typ,uint64 nonce,address signer,uint8 signatureType,address sender,uint256 assetId,uint32 epoch,bytes32 cancelOrderHash,bytes32 replacementOrderHash,uint32 approvalNonce,bool allOrNothing)",
+  ),
+);
 
 export const RESOLUTION_ORDER_TYPEHASH = keccak256(
   Buffer.from(
@@ -117,24 +119,24 @@ export const AGENT_APPROVAL_TYPEHASH = keccak256(
 );
 
 export const DEPOSIT_LEDGER_ABI = [
-    "event DepositQueued(uint256 indexed index,address indexed user,uint256 amount)",
-    "function SETTLEMENT_TOKEN() view returns (address)",
-    "function ACCOUNT_LEDGER() view returns (address)",
-    "function PERMIT2() view returns (address)",
-    "function pendingBalance() view returns (uint256)",
-    "function processedBalance() view returns (uint256)",
-    "function pendingDepositCount() view returns (uint128)",
-    "function nextPendingDepositId() view returns (uint128)",
-    "function processedDepositIndex() view returns (uint128)",
-    "function minBlockWait() view returns (uint256)",
-    "function canProcessNext() view returns (bool)",
-    "function deposit(uint256 amount)",
-    "function depositWithPermit(uint256 amount,uint256 nonce,address owner,uint256 deadline,bytes signature)",
+  "event DepositQueued(uint256 indexed index,address indexed user,uint256 amount)",
+  "function SETTLEMENT_TOKEN() view returns (address)",
+  "function ACCOUNT_LEDGER() view returns (address)",
+  "function PERMIT2() view returns (address)",
+  "function pendingBalance() view returns (uint256)",
+  "function processedBalance() view returns (uint256)",
+  "function pendingDepositCount() view returns (uint128)",
+  "function nextPendingDepositId() view returns (uint128)",
+  "function processedDepositIndex() view returns (uint128)",
+  "function minBlockWait() view returns (uint256)",
+  "function canProcessNext() view returns (bool)",
+  "function deposit(uint256 amount)",
+  "function depositWithPermit(uint256 amount,uint256 nonce,address owner,uint256 deadline,bytes signature)",
 ] as const;
 
 export const ERC20_ABI = [
-    "function approve(address spender,uint256 amount) returns (bool)",
-    "function allowance(address owner,address spender) view returns (uint256)",
-    "function balanceOf(address owner) view returns (uint256)",
-    "function decimals() view returns (uint8)",
+  "function approve(address spender,uint256 amount) returns (bool)",
+  "function allowance(address owner,address spender) view returns (uint256)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
 ] as const;
