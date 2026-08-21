@@ -7,6 +7,7 @@ import {
   createInfoClient,
   HttpResponseError,
   HttpAbortError,
+  HttpTransportError,
   HttpTimeoutError,
   NonceManager,
   ProtocolValidationError,
@@ -856,6 +857,26 @@ test("HTTP clients throw HttpResponseError for non-2xx responses", async () => {
       assert.ok(error instanceof HttpResponseError);
       assert.equal(error.status, 500);
       assert.deepEqual(error.data, { error: "boom" });
+      return true;
+    },
+  );
+});
+
+test("HTTP clients normalize fetch transport failures", async () => {
+  const cause = new Error("socket disconnected");
+  const client = createInfoClient({
+    apiUrl: "http://localhost:3000",
+    fetch: async () => {
+      throw cause;
+    },
+  });
+
+  await assert.rejects(
+    () => client.getHealth(),
+    (error) => {
+      assert.ok(error instanceof HttpTransportError);
+      assert.equal(error.url, "http://localhost:3000/health");
+      assert.equal(error.cause, cause);
       return true;
     },
   );

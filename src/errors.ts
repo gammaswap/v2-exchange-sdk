@@ -50,6 +50,18 @@ export class HttpResponseError extends HttpClientError {
   }
 }
 
+export class HttpTransportError extends HttpClientError {
+  readonly url: string;
+  readonly cause: unknown;
+
+  constructor(url: string, cause: unknown) {
+    super(`HTTP transport failed for ${url}`);
+    this.name = "HttpTransportError";
+    this.url = url;
+    this.cause = cause;
+  }
+}
+
 export class HttpTimeoutError extends HttpClientError {
   readonly timeoutMs: number;
 

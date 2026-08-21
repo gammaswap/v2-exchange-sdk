@@ -31,7 +31,9 @@ import { getDefaultExchangeChainConfig } from "./config.js";
 import { parsePositiveAmountInput, parsePriceInput, parseSizeInput } from "./decimal-inputs.js";
 import {
   HttpAbortError,
+  HttpClientError,
   HttpResponseError,
+  HttpTransportError,
   HttpTimeoutError,
   createProtocolValidationError,
 } from "./errors.js";
@@ -978,7 +980,10 @@ async function requestWithOptions<T>(
     if (controller.signal.aborted) {
       throw new HttpAbortError(callerSignal?.reason ?? error);
     }
-    throw error;
+    if (error instanceof HttpClientError) {
+      throw error;
+    }
+    throw new HttpTransportError(url, error);
   } finally {
     clearTimeout(timer);
     callerSignal?.removeEventListener("abort", abortFromCaller);

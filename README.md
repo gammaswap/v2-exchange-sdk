@@ -239,6 +239,9 @@ request options are supported by `ExchangeClient` action methods.
   sequence IDs are also converted to `bigint` to avoid precision loss.
 - HTTP errors remain `HttpResponseError` instances and preserve the API's raw
   error payload in `error.data`.
+- Network and other fetch-level failures are normalized to
+  `HttpTransportError`; the original error is available as `error.cause` and
+  the requested URL as `error.url`.
 - `apiUrl` is normalized with a trailing slash internally.
 - `getExchangeConfig()` fetches configured contract addresses from the API, but
   the SDK also has hard-coded defaults for supported chain IDs.
