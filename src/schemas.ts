@@ -29,12 +29,30 @@ import type {
   ExchangeContracts,
   GetAgentApprovalRequest,
   GetAssetRequest,
+  GetAssetAtEpochRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
   GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetClaimableRequest,
+  GetMarkPriceRequest,
+  GetSettlementPriceRequest,
+  AssetSnapshot,
+  AgentApprovalResponse,
+  BalanceResponse,
+  BookOrdersResponse,
+  ClaimableResponse,
+  HealthResponse,
+  MarkPriceResponse,
+  OrderBookLevel,
+  OrderBookOrder,
+  OrderBookResponse,
+  PositionResponse,
+  ResolutionPriceResponse,
+  SettlementPriceResponse,
+  TopOfBookResponse,
   GetResolutionPriceRequest,
   GetTopOfBookRequest,
   OraclePriceUpdate,
@@ -270,6 +288,101 @@ function nested<T extends object>(schema: InternalProtocolSchema<T>): FieldSpec<
     serialize: (value) => schema.serialize(value),
   };
 }
+
+function exactString(expected: string): FieldSpec<string> {
+  return {
+    parse: (input, path) => {
+      const value = parseString(input, path);
+      if (value !== expected) {
+        throw createProtocolValidationError("invalid_value", path, `expected ${expected}`);
+      }
+      return value;
+    },
+    serialize: (value) => value,
+  };
+}
+
+const jsonUint64: FieldSpec<bigint> = {
+  parse: (input, path) => parseSafeJsonUnsignedInteger(input, path, UINT64_MAX),
+  serialize: (value) => value.toString(),
+};
+
+const jsonUint256: FieldSpec<bigint> = {
+  parse: (input, path) => parseSafeJsonUnsignedInteger(input, path, UINT256_MAX),
+  serialize: (value) => value.toString(),
+};
+
+function assertAllowedFields(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+  path: string,
+): void {
+  const allowed = new Set(fields);
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) {
+      throw createProtocolValidationError(
+        "unknown_field",
+        `${path}.${key}`,
+        "field is not part of this schema",
+      );
+    }
+  }
+}
+
+function parseOrderBookOrder(input: unknown, path: string): OrderBookOrder {
+  const record = parseObject(input, path);
+  assertAllowedFields(record, ["id", "size", "price", "time", "account"], path);
+
+  return {
+    id: parseString(getRequiredField(record, "id", path), `${path}.id`),
+    size: uint256.parse(getRequiredField(record, "size", path), `${path}.size`),
+    price: jsonUint256.parse(getRequiredField(record, "price", path), `${path}.price`),
+    ...(record.time === undefined ? {} : { time: jsonUint64.parse(record.time, `${path}.time`) }),
+    ...(record.account === undefined
+      ? {}
+      : { account: parseAddress(record.account, `${path}.account`) }),
+  };
+}
+
+function parseOrderBookLevel(input: unknown, path: string): OrderBookLevel {
+  const record = parseObject(input, path);
+  assertAllowedFields(record, ["price", "size", "orderCount", "orders"], path);
+
+  return {
+    price: jsonUint256.parse(getRequiredField(record, "price", path), `${path}.price`),
+    size: uint256.parse(getRequiredField(record, "size", path), `${path}.size`),
+    orderCount: jsonUint64.parse(
+      getRequiredField(record, "orderCount", path),
+      `${path}.orderCount`,
+    ),
+    ...(record.orders === undefined
+      ? {}
+      : {
+          orders: parseArray(record.orders, `${path}.orders`, parseOrderBookOrder),
+        }),
+  };
+}
+
+function parseArray<T>(
+  input: unknown,
+  path: string,
+  parser: (value: unknown, path: string) => T,
+): T[] {
+  if (!Array.isArray(input)) {
+    throw createProtocolValidationError("invalid_type", path, "expected an array");
+  }
+  return input.map((value, index) => parser(value, `${path}.${index}`));
+}
+
+const orderBookLevel = {
+  parse: parseOrderBookLevel,
+  serialize: (value: OrderBookLevel) => value,
+} satisfies FieldSpec<OrderBookLevel>;
+
+const orderBookOrders = {
+  parse: (input: unknown, path: string) => parseArray(input, path, parseOrderBookOrder),
+  serialize: (value: OrderBookOrder[]) => value,
+} satisfies FieldSpec<OrderBookOrder[]>;
 
 const timeInForceValues = new Set<bigint>(Object.values(TimeInForce));
 
@@ -591,6 +704,186 @@ export const getAssetRequestSchema = objectSchema<GetAssetRequest>({
   assetId: uint256,
 });
 
+export const getAssetAtEpochRequestSchema = objectSchema<GetAssetAtEpochRequest>({
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const assetSnapshotSchema = objectSchema<AssetSnapshot>({
+  assetId: uint256,
+  epoch: uint32,
+  registered: boolean,
+  expiration: uint64,
+  assetType: uint256,
+  strikePrice: uint256,
+  resolutionPrice: uint256,
+  isResolved: boolean,
+  ledger: address,
+});
+
+export function parseAssetSnapshot(input: unknown): AssetSnapshot {
+  return assetSnapshotSchema.parse(input);
+}
+
+export const healthResponseSchema = objectSchema<HealthResponse>({
+  status: exactString("ok") as FieldSpec<"ok">,
+});
+
+export const balanceResponseSchema = objectSchema<BalanceResponse>({
+  account: address,
+  ts: jsonUint64,
+  balance: uint256,
+  pending: uint256,
+});
+
+export const positionResponseSchema = objectSchema<PositionResponse>({
+  account: address,
+  assetId: uint256,
+  epoch: uint32,
+  ts: jsonUint64,
+  size: uint256,
+  margin: uint256,
+  balance: uint256,
+  pnl: uint256,
+  side: boolean,
+  bSide: boolean,
+  mSide: boolean,
+  pSide: boolean,
+});
+
+export const orderBookResponseSchema = objectSchema<OrderBookResponse>({
+  assetId: uint256,
+  epoch: uint32,
+  ts: jsonUint64,
+  seqId: jsonUint64,
+  bids: {
+    parse: (input, path) => parseArray(input, path, parseOrderBookLevel),
+    serialize: (value) => value,
+  },
+  asks: {
+    parse: (input, path) => parseArray(input, path, parseOrderBookLevel),
+    serialize: (value) => value,
+  },
+});
+
+export const topOfBookResponseSchema = objectSchema<TopOfBookResponse>({
+  assetId: uint256,
+  epoch: uint32,
+  seqId: jsonUint64,
+  ts: jsonUint64,
+  bid: orderBookLevel,
+  ask: orderBookLevel,
+  last: jsonUint256,
+  lastTs: jsonUint64,
+});
+
+export const bookOrdersResponseSchema = objectSchema<BookOrdersResponse>({
+  assetId: uint256,
+  epoch: uint32,
+  seqId: jsonUint64,
+  ts: jsonUint64,
+  buys: orderBookOrders,
+  sells: orderBookOrders,
+});
+
+export const claimableResponseSchema = objectSchema<ClaimableResponse>({
+  account: address,
+  assetId: uint256,
+  epoch: uint32,
+  claimable: uint256,
+});
+
+export const markPriceResponseSchema = objectSchema<MarkPriceResponse>({
+  assetId: uint256,
+  id: jsonUint64,
+  ts: jsonUint64,
+  price: uint256,
+});
+
+export const settlementPriceResponseSchema = objectSchema<SettlementPriceResponse>({
+  assetId: uint256,
+  epoch: uint32,
+  id: jsonUint64,
+  ts: jsonUint64,
+  expirationTime: jsonUint64,
+  settlementPrice: uint256,
+});
+
+export const resolutionPriceResponseSchema = objectSchema<ResolutionPriceResponse>({
+  assetId: uint256,
+  epoch: uint32,
+  id: jsonUint64,
+  ts: jsonUint64,
+  price: uint256,
+  isNull: boolean,
+});
+
+const agentApprovalStatus: FieldSpec<AgentApprovalResponse["status"]> = {
+  parse: (input, path) => {
+    const value = parseString(input, path);
+    if (value !== "active" && value !== "inactive" && value !== "expired") {
+      throw createProtocolValidationError("invalid_value", path, "unknown agent approval status");
+    }
+    return value;
+  },
+  serialize: (value) => value,
+};
+
+const agentAddress: FieldSpec<AgentApprovalResponse["agent"]> = {
+  parse: (input, path) => (input === "" ? "" : parseAddress(input, path)),
+  serialize: (value) => value,
+};
+
+export const agentApprovalResponseSchema = objectSchema<AgentApprovalResponse>({
+  agent: agentAddress,
+  nonce: uint32,
+  status: agentApprovalStatus,
+});
+
+export function parseHealthResponse(input: unknown): HealthResponse {
+  return healthResponseSchema.parse(input);
+}
+
+export function parseBalanceResponse(input: unknown): BalanceResponse {
+  return balanceResponseSchema.parse(input);
+}
+
+export function parsePositionResponse(input: unknown): PositionResponse {
+  return positionResponseSchema.parse(input);
+}
+
+export function parseOrderBookResponse(input: unknown): OrderBookResponse {
+  return orderBookResponseSchema.parse(input);
+}
+
+export function parseTopOfBookResponse(input: unknown): TopOfBookResponse {
+  return topOfBookResponseSchema.parse(input);
+}
+
+export function parseBookOrdersResponse(input: unknown): BookOrdersResponse {
+  return bookOrdersResponseSchema.parse(input);
+}
+
+export function parseClaimableResponse(input: unknown): ClaimableResponse {
+  return claimableResponseSchema.parse(input);
+}
+
+export function parseMarkPriceResponse(input: unknown): MarkPriceResponse {
+  return markPriceResponseSchema.parse(input);
+}
+
+export function parseSettlementPriceResponse(input: unknown): SettlementPriceResponse {
+  return settlementPriceResponseSchema.parse(input);
+}
+
+export function parseResolutionPriceResponse(input: unknown): ResolutionPriceResponse {
+  return resolutionPriceResponseSchema.parse(input);
+}
+
+export function parseAgentApprovalResponse(input: unknown): AgentApprovalResponse {
+  return agentApprovalResponseSchema.parse(input);
+}
+
 export const getResolutionPriceRequestSchema = objectSchema<GetResolutionPriceRequest>({
   assetId: uint256,
   epoch: uint32,
@@ -622,6 +915,21 @@ export const getTopOfBookRequestSchema = objectSchema<GetTopOfBookRequest>({
 
 export const getPositionRequestSchema = objectSchema<GetPositionRequest>({
   account: address,
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const getClaimableRequestSchema = objectSchema<GetClaimableRequest>({
+  account: address,
+  assetId: uint256,
+  epoch: uint32,
+});
+
+export const getMarkPriceRequestSchema = objectSchema<GetMarkPriceRequest>({
+  assetId: uint256,
+});
+
+export const getSettlementPriceRequestSchema = objectSchema<GetSettlementPriceRequest>({
   assetId: uint256,
   epoch: uint32,
 });

@@ -18,7 +18,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules",
-    "scripts/api/**/*.ts"
-  ]
+  "exclude": ["dist", "node_modules", "scripts/api/**/*.ts"]
 }

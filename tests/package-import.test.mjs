@@ -12,6 +12,7 @@ test("package root and public subpath exports can be imported", async () => {
     import("@gammaswap/v2-exchange-sdk/deposit-client"),
     import("@gammaswap/v2-exchange-sdk/errors"),
     import("@gammaswap/v2-exchange-sdk/hashing"),
+    import("@gammaswap/v2-exchange-sdk/assetIdUtils"),
     import("@gammaswap/v2-exchange-sdk/integer-inputs"),
     import("@gammaswap/v2-exchange-sdk/string-inputs"),
     import("@gammaswap/v2-exchange-sdk/oracle-websocket"),
@@ -28,6 +29,7 @@ test("package root and public subpath exports can be imported", async () => {
 
   assert.equal(typeof rootModule.parseUnsignedInteger, "function");
   assert.equal(typeof rootModule.parseAddress, "function");
+  assert.equal(typeof rootModule.decodeAssetId, "function");
   assert.equal(typeof rootModule.createExchangeWebSocketClient, "function");
   assert.equal(typeof rootModule.createOracleWebSocketClient, "function");
 });

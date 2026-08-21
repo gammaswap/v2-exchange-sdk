@@ -50,6 +50,38 @@ export class HttpResponseError extends HttpClientError {
   }
 }
 
+export class HttpTransportError extends HttpClientError {
+  readonly url: string;
+  readonly cause: unknown;
+
+  constructor(url: string, cause: unknown) {
+    super(`HTTP transport failed for ${url}`);
+    this.name = "HttpTransportError";
+    this.url = url;
+    this.cause = cause;
+  }
+}
+
+export class HttpTimeoutError extends HttpClientError {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(`HTTP request timed out after ${timeoutMs}ms`);
+    this.name = "HttpTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+export class HttpAbortError extends HttpClientError {
+  readonly cause?: unknown;
+
+  constructor(cause?: unknown) {
+    super("HTTP request was aborted");
+    this.name = "HttpAbortError";
+    this.cause = cause;
+  }
+}
+
 export function createProtocolValidationError(
   code: ProtocolValidationCode,
   path: string,

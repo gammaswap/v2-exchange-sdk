@@ -3,32 +3,15 @@ import { createInfoClient, HttpResponseError } from "@gammaswap/v2-exchange-sdk"
 
 const API_URL = process.env.API_URL || "http://localhost:3000";
 const ASSET_ID = process.env.ASSET_ID || "261336857817713630688382311349658711122006440411137";
-const EPOCH = process.env.EPOCH || "0";
 
-// run with "pnpm sample:book"
-// or "pnpm sample:book <assetId> <epoch>"
+// run with "pnpm sample:mark-price"
+// or "pnpm sample:mark-price <assetId>"
 async function main() {
-  const client = createInfoClient({
-    apiUrl: API_URL,
-  });
-
-  let assetId = ASSET_ID;
-  let epoch = EPOCH;
-
-  const args = process.argv.slice(2);
-  if (args.length > 0) {
-    assetId = args[0];
-  }
-  if (args.length > 1) {
-    epoch = args[1];
-  }
+  const client = createInfoClient({ apiUrl: API_URL });
+  const assetId = process.argv[2] || ASSET_ID;
 
   try {
-    const res = await client.getOrderBook({
-      assetId,
-      epoch,
-    });
-
+    const res = await client.getMarkPrice(assetId);
     console.log("Server response:", res.status, res.data);
   } catch (err: unknown) {
     if (err instanceof HttpResponseError) {

@@ -5,6 +5,7 @@ export * from "./hashing.js";
 export * from "./builders.js";
 export * from "./config.js";
 export * from "./client.js";
+export * from "./assetIdUtils.js";
 export * from "./decimal-inputs.js";
 export * from "./integer-inputs.js";
 export * from "./string-inputs.js";

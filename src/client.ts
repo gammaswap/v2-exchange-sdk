@@ -29,7 +29,14 @@ import {
 import { SignatureType, TimeInForce } from "./constants.js";
 import { getDefaultExchangeChainConfig } from "./config.js";
 import { parsePositiveAmountInput, parsePriceInput, parseSizeInput } from "./decimal-inputs.js";
-import { HttpResponseError, createProtocolValidationError } from "./errors.js";
+import {
+  HttpAbortError,
+  HttpClientError,
+  HttpResponseError,
+  HttpTransportError,
+  HttpTimeoutError,
+  createProtocolValidationError,
+} from "./errors.js";
 import {
   getExchangeDomain,
   hashAgentApprovalJS,
@@ -44,12 +51,28 @@ import {
 import {
   getAgentApprovalRequestSchema,
   getAssetRequestSchema,
+  getAssetAtEpochRequestSchema,
+  parseAssetSnapshot,
+  parseAgentApprovalResponse,
+  parseBalanceResponse,
+  parseBookOrdersResponse,
+  parseClaimableResponse,
+  parseHealthResponse,
+  parseMarkPriceResponse,
+  parseOrderBookResponse,
+  parsePositionResponse,
+  parseResolutionPriceResponse,
+  parseSettlementPriceResponse,
+  parseTopOfBookResponse,
   getBalanceRequestSchema,
   getBookOrdersRequestSchema,
   getExchangeConfigRequestSchema,
   getLastResolutionPriceRequestSchema,
   getOrderBookRequestSchema,
   getPositionRequestSchema,
+  getClaimableRequestSchema,
+  getMarkPriceRequestSchema,
+  getSettlementPriceRequestSchema,
   getResolutionPriceRequestSchema,
   getTopOfBookRequestSchema,
   parseExchangeChainConfig,
@@ -57,7 +80,7 @@ import {
   toJsonExchangeChainConfig,
 } from "./schemas.js";
 import { signOrderJS } from "./signing.js";
-import { UINT32_MAX, parseUnsignedInteger } from "./integer-inputs.js";
+import { UINT32_MAX, parsePositiveIntegerOption, parseUnsignedInteger } from "./integer-inputs.js";
 import { sameAddress } from "./string-inputs.js";
 import type {
   Address,
@@ -66,15 +89,31 @@ import type {
   ExchangeContractsInput,
   GetAgentApprovalRequest,
   GetAssetRequest,
+  GetAssetAtEpochRequest,
   GetBalanceRequest,
   GetBookOrdersRequest,
   GetExchangeConfigRequest,
   GetLastResolutionPriceRequest,
   GetOrderBookRequest,
   GetPositionRequest,
+  GetClaimableRequest,
+  GetMarkPriceRequest,
+  GetSettlementPriceRequest,
   GetResolutionPriceRequest,
   GetTopOfBookRequest,
   JsonExchangeChainConfig,
+  AssetSnapshot,
+  AgentApprovalResponse,
+  BalanceResponse,
+  BookOrdersResponse,
+  ClaimableResponse,
+  HealthResponse,
+  MarkPriceResponse,
+  OrderBookResponse,
+  PositionResponse,
+  ResolutionPriceResponse,
+  SettlementPriceResponse,
+  TopOfBookResponse,
   JsonSignedApproveAgentMessage,
   JsonSignedCancelMessage,
   JsonSignedCancelReplaceMessage,
@@ -124,6 +163,12 @@ export interface HttpClientOptions {
   apiUrl: string;
   fetch?: FetchLike;
   headers?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+export interface HttpRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export type InfoClientOptions = HttpClientOptions;
@@ -159,116 +204,227 @@ interface CancelReplaceSigningInput extends Omit<BuildCancelReplaceInput, "repla
 const MIN_AGENT_ACTION_APPROVAL_NONCE = 1_780_272_000n;
 const APPROVE_AGENT_MIN_FUTURE_SECONDS = 10n;
 const APPROVE_AGENT_MAX_FUTURE_SECONDS = 5n * 60n;
+const DEFAULT_HTTP_TIMEOUT_MS = 30_000;
 
 export class InfoClient {
   readonly apiUrl: string;
   private readonly fetchFn: FetchLike;
   private readonly headers: Record<string, string>;
+  private readonly timeoutMs: number;
 
   constructor(options: InfoClientOptions) {
     this.apiUrl = normalizeApiUrl(options.apiUrl);
     this.fetchFn = options.fetch ?? defaultFetch;
     this.headers = options.headers ?? {};
+    this.timeoutMs = parseHttpTimeout(options.timeoutMs ?? DEFAULT_HTTP_TIMEOUT_MS, "$.timeoutMs");
+  }
+
+  async getHealth(options?: HttpRequestOptions): Promise<HttpResult<HealthResponse>> {
+    const response = await this.get("/health", options);
+    return { ...response, data: parseHealthResponse(response.data) };
   }
 
   async getAsset(
     input: ProtocolInput<GetAssetRequest> | ProtocolBigNumberish,
-  ): Promise<HttpResult> {
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<AssetSnapshot>> {
     const request = getAssetRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
-    return this.get(`/asset/${encodePathSegment(request.assetId)}`);
+    const response = await this.get(`/asset/${encodePathSegment(request.assetId)}`, options);
+    return { ...response, data: parseAssetSnapshot(response.data) };
   }
 
-  async getResolutionPrice(input: ProtocolInput<GetResolutionPriceRequest>): Promise<HttpResult> {
-    const request = getResolutionPriceRequestSchema.parse(input);
-    return this.get(
-      `/resolve/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+  async getAssetAtEpoch(
+    input: ProtocolInput<GetAssetAtEpochRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<AssetSnapshot>> {
+    const request = getAssetAtEpochRequestSchema.parse(input);
+    const response = await this.get(
+      `/asset/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+      options,
     );
+    return { ...response, data: parseAssetSnapshot(response.data) };
+  }
+
+  async getResolutionPrice(
+    input: ProtocolInput<GetResolutionPriceRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<ResolutionPriceResponse>> {
+    const request = getResolutionPriceRequestSchema.parse(input);
+    const response = await this.get(
+      `/resolve/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+      options,
+    );
+    return { ...response, data: parseResolutionPriceResponse(response.data) };
   }
 
   async getLastResolutionPrice(
     input: ProtocolInput<GetLastResolutionPriceRequest> | ProtocolBigNumberish,
-  ): Promise<HttpResult> {
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<ResolutionPriceResponse>> {
     const request = getLastResolutionPriceRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { assetId: input },
     );
-    return this.get(`/resolve/last/epoch/${encodePathSegment(request.assetId)}`);
+    const response = await this.get(
+      `/resolve/last/epoch/${encodePathSegment(request.assetId)}`,
+      options,
+    );
+    return { ...response, data: parseResolutionPriceResponse(response.data) };
   }
 
-  async getBalance(input: ProtocolInput<GetBalanceRequest> | Address): Promise<HttpResult> {
+  async getBalance(
+    input: ProtocolInput<GetBalanceRequest> | Address,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<BalanceResponse>> {
     const request = getBalanceRequestSchema.parse(
       typeof input === "string" ? { account: input } : input,
     );
-    return this.get(`/balance/${encodePathSegment(request.account)}`);
+    const response = await this.get(`/balance/${encodePathSegment(request.account)}`, options);
+    return { ...response, data: parseBalanceResponse(response.data) };
   }
 
-  async getOrderBook(input: ProtocolInput<GetOrderBookRequest>): Promise<HttpResult> {
+  async getOrderBook(
+    input: ProtocolInput<GetOrderBookRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<OrderBookResponse>> {
     const request = getOrderBookRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+      options,
     );
+    return { ...response, data: parseOrderBookResponse(response.data) };
   }
 
-  async getBookOrders(input: ProtocolInput<GetBookOrdersRequest>): Promise<HttpResult> {
+  async getBookOrders(
+    input: ProtocolInput<GetBookOrdersRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<BookOrdersResponse>> {
     const request = getBookOrdersRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/${encodePathSegment(request.assetId)}/${encodePathSegment(
         request.epoch,
       )}/${encodePathSegment(request.account)}`,
+      options,
     );
+    return { ...response, data: parseBookOrdersResponse(response.data) };
   }
 
-  async getTopOfBook(input: ProtocolInput<GetTopOfBookRequest>): Promise<HttpResult> {
+  async getTopOfBook(
+    input: ProtocolInput<GetTopOfBookRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<TopOfBookResponse>> {
     const request = getTopOfBookRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/book/market/top/${encodePathSegment(request.assetId)}/${encodePathSegment(request.epoch)}`,
+      options,
     );
+    return { ...response, data: parseTopOfBookResponse(response.data) };
   }
 
-  async getPosition(input: ProtocolInput<GetPositionRequest>): Promise<HttpResult> {
+  async getPosition(
+    input: ProtocolInput<GetPositionRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<PositionResponse>> {
     const request = getPositionRequestSchema.parse(input);
-    return this.get(
+    const response = await this.get(
       `/position/${encodePathSegment(request.account)}/${encodePathSegment(
         request.assetId,
       )}/${encodePathSegment(request.epoch)}`,
+      options,
     );
+    return { ...response, data: parsePositionResponse(response.data) };
+  }
+
+  async getClaimable(
+    input: ProtocolInput<GetClaimableRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<ClaimableResponse>> {
+    const request = getClaimableRequestSchema.parse(input);
+    const response = await this.get(
+      `/claim/${encodePathSegment(request.assetId)}/${encodePathSegment(
+        request.epoch,
+      )}/${encodePathSegment(request.account)}`,
+      options,
+    );
+    return { ...response, data: parseClaimableResponse(response.data) };
+  }
+
+  async getMarkPrice(
+    input: ProtocolInput<GetMarkPriceRequest> | ProtocolBigNumberish,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<MarkPriceResponse>> {
+    const request = getMarkPriceRequestSchema.parse(
+      typeof input === "object" && input !== null ? input : { assetId: input },
+    );
+    const response = await this.get(`/resolve/mark/${encodePathSegment(request.assetId)}`, options);
+    return { ...response, data: parseMarkPriceResponse(response.data) };
+  }
+
+  async getSettlementPrice(
+    input: ProtocolInput<GetSettlementPriceRequest>,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<SettlementPriceResponse>> {
+    const request = getSettlementPriceRequestSchema.parse(input);
+    const response = await this.get(
+      `/resolve/settlement/${encodePathSegment(request.assetId)}/${encodePathSegment(
+        request.epoch,
+      )}`,
+      options,
+    );
+    return { ...response, data: parseSettlementPriceResponse(response.data) };
   }
 
   async getAgentApproval(
     input: ProtocolInput<GetAgentApprovalRequest> | Address,
-  ): Promise<HttpResult> {
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult<AgentApprovalResponse>> {
     const request = getAgentApprovalRequestSchema.parse(
       typeof input === "string" ? { account: input } : input,
     );
-    return this.get(`/agents/status/${encodePathSegment(request.account)}`);
+    const response = await this.get(
+      `/agents/status/${encodePathSegment(request.account)}`,
+      options,
+    );
+    return { ...response, data: parseAgentApprovalResponse(response.data) };
   }
 
   async getAgentApprovalNonce(
     input: ProtocolInput<GetAgentApprovalRequest> | Address,
+    options?: HttpRequestOptions,
   ): Promise<bigint> {
-    const response = await this.getAgentApproval(input);
+    const response = await this.getAgentApproval(input, options);
     const status = parseAgentStatusResponse(response.data);
     return BigInt(status.nonce);
   }
 
   async getExchangeConfig(
     input: ProtocolInput<GetExchangeConfigRequest> | ProtocolBigNumberish,
+    options?: HttpRequestOptions,
   ): Promise<HttpResult<JsonExchangeChainConfig>> {
     const request = getExchangeConfigRequestSchema.parse(
       typeof input === "object" && input !== null ? input : { chainId: input },
     );
-    const response = await this.get(`/config/chains/${encodePathSegment(request.chainId)}`);
+    const response = await this.get(
+      `/config/chains/${encodePathSegment(request.chainId)}`,
+      options,
+    );
     const config = parseExchangeChainConfig(response.data);
     return { ...response, data: toJsonExchangeChainConfig(config) };
   }
 
-  private async get(path: string): Promise<HttpResult> {
-    const response = await this.fetchFn(buildUrl(this.apiUrl, path), {
-      method: "GET",
-      headers: this.headers,
-    });
-    return readHttpResult(response);
+  private async get(path: string, options?: HttpRequestOptions): Promise<HttpResult> {
+    return requestWithOptions(
+      this.fetchFn,
+      buildUrl(this.apiUrl, path),
+      {
+        method: "GET",
+        headers: this.headers,
+      },
+      this.timeoutMs,
+      readHttpResult,
+      options,
+    );
   }
 }
 
@@ -278,6 +434,7 @@ export class ExchangeClient {
   readonly info: InfoClient;
   private readonly fetchFn: FetchLike;
   private readonly headers: Record<string, string>;
+  private readonly timeoutMs: number;
   private readonly chainId: bigint;
   private readonly contracts: ExchangeContracts;
   private readonly exchangeDomain: TypedDataDomain;
@@ -290,6 +447,7 @@ export class ExchangeClient {
     this.wallet = options.wallet;
     this.fetchFn = options.fetch ?? defaultFetch;
     this.headers = options.headers ?? {};
+    this.timeoutMs = parseHttpTimeout(options.timeoutMs ?? DEFAULT_HTTP_TIMEOUT_MS, "$.timeoutMs");
     this.chainId = config.chainId;
     this.contracts = config.contracts;
     this.exchangeDomain = getExchangeDomain(this.chainId, this.contracts.exchange);
@@ -299,12 +457,14 @@ export class ExchangeClient {
         apiUrl: this.apiUrl,
         fetch: this.fetchFn,
         headers: this.headers,
+        timeoutMs: this.timeoutMs,
       });
     this.nonceManager = options.nonceManager ?? new NonceManager();
   }
 
   async placeOrder<const TInput extends PlaceOrderInput>(
     input: ExactInput<PlaceOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const order = buildOrder({
       ...input,
@@ -325,15 +485,16 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedOrderMessageJson(message);
-    const response = await this.post("/orders", request);
+    const response = await this.post("/orders", request, options);
     return { ...response, request };
   }
 
   async placeAgentOrder<const TInput extends PlaceAgentOrderInput>(
     input: ExactInput<PlaceAgentOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedOrderMessage>> {
     const approvalNonce = parseAgentActionApprovalNonce(
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender, options)),
     );
     const order = buildOrder({
       ...input,
@@ -353,130 +514,163 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedOrderMessageJson(message);
-    const response = await this.post("/orders", request);
+    const response = await this.post("/orders", request, options);
     return { ...response, request };
   }
 
   async cancelOrder<const TInput extends CancelOrderInput>(
     input: ExactInput<CancelOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    return this.signAndPostCancel({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.EOA,
-      sender: this.wallet.address,
-      approvalNonce: 0n,
-    });
+    return this.signAndPostCancel(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.EOA,
+        sender: this.wallet.address,
+        approvalNonce: 0n,
+      },
+      options,
+    );
   }
 
   async cancelAll<const TInput extends CancelAllInput>(
     input: ExactInput<CancelAllInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    return this.cancelOrder({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      orderHash: ZeroHash,
-    });
+    return this.cancelOrder(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        orderHash: ZeroHash,
+      },
+      options,
+    );
   }
 
   async cancelReplaceOrder<const TInput extends CancelReplaceOrderInput>(
     input: ExactInput<CancelReplaceOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
     assertNonZeroCancelReplaceHash(input.cancelOrderHash);
 
-    return this.signAndPostCancelReplace({
-      ...input,
-      price: parsePriceInput(input.price),
-      size: parseSizeInput(input.size),
-      timeInForce: input.timeInForce ?? TimeInForce.GTC,
-      replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.EOA,
-      sender: this.wallet.address,
-      approvalNonce: 0n,
-      allOrNothing: input.allOrNothing ?? false,
-    });
+    return this.signAndPostCancelReplace(
+      {
+        ...input,
+        price: parsePriceInput(input.price),
+        size: parseSizeInput(input.size),
+        timeInForce: input.timeInForce ?? TimeInForce.GTC,
+        replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.EOA,
+        sender: this.wallet.address,
+        approvalNonce: 0n,
+        allOrNothing: input.allOrNothing ?? false,
+      },
+      options,
+    );
   }
 
   async cancelAgentOrder<const TInput extends CancelAgentOrderInput>(
     input: ExactInput<CancelAgentOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     const approvalNonce = parseAgentActionApprovalNonce(
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender, options)),
     );
-    return this.signAndPostCancel({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.AGENT,
-      approvalNonce,
-    });
+    return this.signAndPostCancel(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.AGENT,
+        approvalNonce,
+      },
+      options,
+    );
   }
 
   async cancelAllAgent<const TInput extends CancelAllAgentInput>(
     input: ExactInput<CancelAllAgentInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
-    return this.cancelAgentOrder({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      orderHash: ZeroHash,
-    });
+    return this.cancelAgentOrder(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        orderHash: ZeroHash,
+      },
+      options,
+    );
   }
 
   async cancelReplaceAgentOrder<const TInput extends CancelReplaceAgentOrderInput>(
     input: ExactInput<CancelReplaceAgentOrderInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
     assertNonZeroCancelReplaceHash(input.cancelOrderHash);
 
     const approvalNonce = parseAgentActionApprovalNonce(
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender, options)),
     );
-    return this.signAndPostCancelReplace({
-      ...input,
-      price: parsePriceInput(input.price),
-      size: parseSizeInput(input.size),
-      timeInForce: input.timeInForce ?? TimeInForce.GTC,
-      replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.AGENT,
-      approvalNonce,
-      allOrNothing: input.allOrNothing ?? false,
-    });
+    return this.signAndPostCancelReplace(
+      {
+        ...input,
+        price: parsePriceInput(input.price),
+        size: parseSizeInput(input.size),
+        timeInForce: input.timeInForce ?? TimeInForce.GTC,
+        replacementNonce: input.replacementNonce ?? this.nonceManager.next(),
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.AGENT,
+        approvalNonce,
+        allOrNothing: input.allOrNothing ?? false,
+      },
+      options,
+    );
   }
 
   async claim<const TInput extends ClaimInput>(
     input: ExactInput<ClaimInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
-    return this.signAndPostClaim({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.EOA,
-      sender: this.wallet.address,
-      approvalNonce: 0n,
-    });
+    return this.signAndPostClaim(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.EOA,
+        sender: this.wallet.address,
+        approvalNonce: 0n,
+      },
+      options,
+    );
   }
 
   async claimAgent<const TInput extends AgentClaimInput>(
     input: ExactInput<AgentClaimInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     const approvalNonce = parseAgentActionApprovalNonce(
-      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender)),
+      input.approvalNonce ?? (await this.info.getAgentApprovalNonce(input.sender, options)),
     );
-    return this.signAndPostClaim({
-      ...input,
-      nonce: input.nonce ?? this.nonceManager.next(),
-      signer: this.wallet.address,
-      signatureType: SignatureType.AGENT,
-      approvalNonce,
-    });
+    return this.signAndPostClaim(
+      {
+        ...input,
+        nonce: input.nonce ?? this.nonceManager.next(),
+        signer: this.wallet.address,
+        signatureType: SignatureType.AGENT,
+        approvalNonce,
+      },
+      options,
+    );
   }
 
   async withdraw<const TInput extends WithdrawalInput>(
     input: ExactInput<WithdrawalInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedWithdrawalMessage>> {
     const withdrawal = buildWithdrawal({
       ...input,
@@ -496,12 +690,13 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedWithdrawalMessageJson(message);
-    const response = await this.post("/withdrawals", request);
+    const response = await this.post("/withdrawals", request, options);
     return { ...response, request };
   }
 
   async approveAgent<const TInput extends ApproveAgentInput>(
     input: ExactInput<ApproveAgentInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedApproveAgentMessage>> {
     const sender = this.wallet.address;
     const approvalNonce = parseApproveAgentApprovalNonce(
@@ -537,12 +732,13 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedApproveAgentMessageJson(message);
-    const response = await this.post("/agents/approve", request);
+    const response = await this.post("/agents/approve", request, options);
     return { ...response, request };
   }
 
   async revokeAgent<const TInput extends RevokeAgentInput>(
     input: ExactInput<RevokeAgentInput, TInput>,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedRevokeAgentMessage>> {
     const revocation = buildRevokeAgent({
       ...input,
@@ -559,7 +755,7 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedRevokeAgentMessageJson(message);
-    const response = await this.post("/agents/revoke", request);
+    const response = await this.post("/agents/revoke", request, options);
     return { ...response, request };
   }
 
@@ -571,6 +767,7 @@ export class ExchangeClient {
 
   private async signAndPostCancel(
     input: BuildCancelInput,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelMessage>> {
     const cancel = buildCancel(input);
     const orderHash = hashCancelOrderJS(cancel, this.exchangeDomain);
@@ -581,12 +778,13 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedCancelMessageJson(message);
-    const response = await this.post("/cancels", request);
+    const response = await this.post("/cancels", request, options);
     return { ...response, request };
   }
 
   private async signAndPostCancelReplace(
     input: CancelReplaceSigningInput,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedCancelReplaceMessage>> {
     const replacement = buildOrder({
       nonce: input.replacementNonce,
@@ -626,12 +824,13 @@ export class ExchangeClient {
       replacementSignature,
     });
     const request = buildSignedCancelReplaceMessageJson(message);
-    const response = await this.post("/cancel-replace", request);
+    const response = await this.post("/cancel-replace", request, options);
     return { ...response, request };
   }
 
   private async signAndPostClaim(
     input: BuildClaimInput,
+    options?: HttpRequestOptions,
   ): Promise<ExchangeActionResult<JsonSignedClaimMessage>> {
     const claim = buildClaim(input);
     const orderHash = hashClaimOrderJS(claim, this.exchangeDomain);
@@ -642,20 +841,30 @@ export class ExchangeClient {
       signature: signOrderJS(orderHash, this.wallet),
     });
     const request = buildSignedClaimMessageJson(message);
-    const response = await this.post("/claim", request);
+    const response = await this.post("/claim", request, options);
     return { ...response, request };
   }
 
-  private async post(path: string, body: unknown): Promise<HttpResult> {
-    const response = await this.fetchFn(buildUrl(this.apiUrl, path), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...this.headers,
+  private async post(
+    path: string,
+    body: unknown,
+    options?: HttpRequestOptions,
+  ): Promise<HttpResult> {
+    return requestWithOptions(
+      this.fetchFn,
+      buildUrl(this.apiUrl, path),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.headers,
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
-    return readHttpResult(response);
+      this.timeoutMs,
+      readHttpResult,
+      options,
+    );
   }
 }
 
@@ -721,6 +930,66 @@ function assertNonZeroCancelReplaceHash(orderHash: unknown): void {
 const defaultFetch: FetchLike = async (url, init) => {
   return fetch(url, init);
 };
+
+function parseHttpTimeout(input: number, path: string): number {
+  return parsePositiveIntegerOption(input, path);
+}
+
+async function requestWithOptions<T>(
+  fetchFn: FetchLike,
+  url: string,
+  init: RequestInit,
+  defaultTimeoutMs: number,
+  readResponse: (response: FetchResponseLike) => Promise<T>,
+  options?: HttpRequestOptions,
+): Promise<T> {
+  const timeoutMs = parseHttpTimeout(options?.timeoutMs ?? defaultTimeoutMs, "$.timeoutMs");
+  const controller = new AbortController();
+  const callerSignal = options?.signal;
+  let didTimeout = false;
+  if (callerSignal?.aborted) {
+    throw new HttpAbortError(callerSignal.reason);
+  }
+
+  const abortFromCaller = (): void => {
+    controller.abort(callerSignal?.reason);
+  };
+
+  callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  const timer = setTimeout(() => {
+    didTimeout = true;
+    controller.abort(new HttpTimeoutError(timeoutMs));
+  }, timeoutMs);
+  let rejectOnAbort: ((reason?: unknown) => void) | undefined;
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    rejectOnAbort = reject;
+  });
+  void abortPromise.catch(() => undefined);
+  const rejectResponseOnAbort = (): void => {
+    rejectOnAbort?.(controller.signal.reason);
+  };
+  controller.signal.addEventListener("abort", rejectResponseOnAbort, { once: true });
+
+  try {
+    const response = await fetchFn(url, { ...init, signal: controller.signal });
+    return await Promise.race([readResponse(response), abortPromise]);
+  } catch (error) {
+    if (didTimeout) {
+      throw new HttpTimeoutError(timeoutMs);
+    }
+    if (controller.signal.aborted) {
+      throw new HttpAbortError(callerSignal?.reason ?? error);
+    }
+    if (error instanceof HttpClientError) {
+      throw error;
+    }
+    throw new HttpTransportError(url, error);
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+    controller.signal.removeEventListener("abort", rejectResponseOnAbort);
+  }
+}
 
 async function readHttpResult(response: FetchResponseLike): Promise<HttpResult> {
   const data = await readResponseData(response);
