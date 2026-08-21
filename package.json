@@ -88,7 +88,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "pnpm build && node --test tests/*.test.mjs",
     "lint": "eslint \"src/**/*.ts\"",

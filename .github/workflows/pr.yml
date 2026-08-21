@@ -32,3 +32,5 @@ jobs:
         run: pnpm lint
       - name: Check Formatting
         run: pnpm format:check
+      - name: Validate Package
+        run: pnpm validate:package
