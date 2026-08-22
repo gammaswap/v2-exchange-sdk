@@ -33,6 +33,7 @@ export const TimeInForce = {
   GTC: 0n,
   FOK: 1n,
   IOC: 2n,
+  ALO: 3n,
 } as const;
 
 export const OrderSide = {
