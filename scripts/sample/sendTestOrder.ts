@@ -27,7 +27,8 @@ function parseTimeInForce(value: string | undefined): bigint {
   if (tif === "gtc") return TimeInForce.GTC;
   if (tif === "fok") return TimeInForce.FOK;
   if (tif === "ioc") return TimeInForce.IOC;
-  throw new Error(`Invalid timeInForce ${value}; expected gtc, fok, or ioc`);
+  if (tif === "alo") return TimeInForce.ALO;
+  throw new Error(`Invalid timeInForce ${value}; expected gtc, fok, ioc, or alo`);
 }
 
 async function main() {
