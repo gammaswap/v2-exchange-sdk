@@ -1,6 +1,6 @@
 {
   "name": "@gammaswap/v2-exchange-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "TypeScript SDK for the GammaSwap v2 exchange.",
   "license": "MIT",
   "type": "module",

@@ -341,7 +341,7 @@ the configured wallet address as `sender`.
 | `price`            | Human decimal limit price string. One decimal place is allowed and interpreted as cents.       |
 | `size`             | Human decimal order size string. Up to two decimal places.                                     |
 | `amount`           | Human decimal withdrawal amount string. Up to two decimal places.                              |
-| `timeInForce`      | Optional time-in-force value. Defaults to `TimeInForce.GTC`.                                   |
+| `timeInForce`      | Optional time-in-force value: `GTC`, `FOK`, `IOC`, or `ALO`. Defaults to `TimeInForce.GTC`.    |
 | `nonce`            | Optional action nonce. Defaults to `nonceManager.next()`.                                      |
 | `replacementNonce` | Optional nonce for the replacement order in cancel-replace. Defaults to `nonceManager.next()`. |
 | `orderHash`        | Existing order id/hash to cancel.                                                              |

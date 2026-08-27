@@ -389,6 +389,21 @@ test("ExchangeClient signs and posts regular order, cancel, claim, withdrawal, a
   );
 });
 
+test("ExchangeClient accepts ALO time-in-force orders", async () => {
+  const mock = createFetchMock(() => ({ data: { accepted: true } }));
+  const client = createExchangeClient({
+    apiUrl: "http://localhost:3000",
+    wallet: WALLET,
+    chainId: "31337",
+    contracts: exchangeConfig().contracts,
+    fetch: mock.fetch,
+  });
+
+  const result = await client.placeOrder(baseOrderInput({ timeInForce: TimeInForce.ALO }));
+
+  assert.equal(result.request.order.timeInForce, "3");
+});
+
 test("ExchangeClient placeOrder uses its nonce manager when nonce is omitted", async () => {
   const nowMs = 1_700_000_000_000;
   const nonceManager = new NonceManager({
