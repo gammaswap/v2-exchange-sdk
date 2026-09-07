@@ -629,6 +629,22 @@ publishable tarball with pnpm, installs it into a temporary consumer project,
 and tests the package root and public subpath imports from that packed
 artifact.
 
+To check balances and positions for multiple accounts against a running
+exchange, set comma-separated `ACCOUNT_LIST` and `ASSET_ID_LIST` values and
+run:
+
+```sh
+API_URL=http://localhost:3000 \
+ACCOUNT_LIST=0xAccountOne,0xAccountTwo \
+ASSET_ID_LIST=1,2,3 \
+pnpm test:accounts
+```
+
+The script gets each asset's current epoch and calls `getPosition()` for every
+account/asset combination at that epoch. Set `EPOCH` to use one explicit epoch
+for every asset instead. Balance, asset, and position requests within each
+stage run concurrently.
+
 ### Release validation
 
 CI runs the build, tests, typecheck, lint, formatting check, and packed-package
