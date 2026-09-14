@@ -88,6 +88,19 @@ When using environment variables, load `dotenv` before importing the SDK
 because the default hashing domain is initialized when the hashing module is
 imported.
 
+## Production endpoints
+
+| Service             | Endpoint                                  |
+| ------------------- | ----------------------------------------- |
+| Exchange HTTP API   | `https://exchange-api.gammaswap.com/api/` |
+| Orderbook WebSocket | `wss://external-api.gammaswap.com/ws/`    |
+| Oracle WebSocket    | `wss://oracle-api.gammaswap.com/ws/`      |
+
+The HTTP API endpoint includes the `/api/` path. Local development uses
+different endpoints, such as `http://localhost:3000` for the HTTP API,
+`ws://localhost:4000` for the orderbook WebSocket, and `ws://localhost:8082`
+for the oracle WebSocket.
+
 ## Imports
 
 ```ts
