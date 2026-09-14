@@ -1,6 +1,6 @@
 {
   "name": "@gammaswap/v2-exchange-sdk",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "TypeScript SDK for the GammaSwap v2 exchange.",
   "license": "MIT",
   "type": "module",
@@ -156,7 +156,8 @@
     "url": "git+ssh://git@github.com/gammaswap/v2-exchange-sdk.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@gammaswap"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "bugs": {
     "url": "https://github.com/gammaswap/v2-exchange-sdk/issues"
