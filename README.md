@@ -13,6 +13,58 @@ TypeScript SDK for the GammaSwap v2 exchange.
 npm install @gammaswap/v2-exchange-sdk
 ```
 
+## Environment variables
+
+The SDK does not automatically load `.env` files. Your application must load
+environment variables itself. For Node.js applications, install `dotenv`:
+
+```sh
+npm install dotenv
+```
+
+Then load it before reading `process.env`:
+
+```ts
+import "dotenv/config";
+```
+
+Example `.env` file:
+
+```env
+# Exchange HTTP API
+API_URL=https://exchange-api.gammaswap.com/api/
+
+# EVM JSON-RPC endpoint
+RPC_URL=https://sepolia.base.org
+
+# Network
+CHAIN_ID=84532
+
+# Never commit this value or print it in logs
+PRIVATE_KEY=your-private-key
+
+# Required for Base Sepolia deposits unless supplied directly in code
+DEPOSIT_LEDGER_CONTRACT=0xYourDepositLedgerAddress
+
+# Optional websocket endpoints
+ORDERBOOK_WS_URL=wss://external-api.gammaswap.com/ws/
+ORACLE_FEED_WS_URL=wss://oracle-api.gammaswap.com/ws/
+```
+
+Do not commit `.env` files or private keys. Add `.env` to `.gitignore`.
+Environment variables are application configuration; the SDK client
+constructors receive their values explicitly.
+
+| Variable                  | Used for                            | Required                             |
+| ------------------------- | ----------------------------------- | ------------------------------------ |
+| `API_URL`                 | `InfoClient` and `ExchangeClient`   | Yes for HTTP clients                 |
+| `RPC_URL`                 | `DepositClient` JSON-RPC connection | Yes for deposits                     |
+| `CHAIN_ID`                | Network selection                   | Yes for signed/on-chain clients      |
+| `PRIVATE_KEY`             | Wallet signing                      | Yes for signed actions               |
+| `DEPOSIT_LEDGER_CONTRACT` | DepositLedger address               | Required on Base Sepolia currently   |
+| `ORDERBOOK_WS_URL`        | Exchange websocket endpoint         | Required for orderbook websocket use |
+| `ORACLE_FEED_WS_URL`      | Oracle websocket sample             | Required by oracle websocket samples |
+
 ## Imports
 
 ```ts
@@ -164,7 +216,7 @@ nonces from your own coordinated source.
 
 ```ts
 const info = createInfoClient({
-  apiUrl: "https://exchange-api.gammaswap.com",
+  apiUrl: "https://exchange-api.gammaswap.com/api/",
 });
 ```
 
@@ -268,7 +320,7 @@ signed payloads to the exchange API.
 import { Wallet } from "ethers";
 
 const exchange = createExchangeClient({
-  apiUrl: "https://exchange-api.gammaswap.com",
+  apiUrl: "https://exchange-api.gammaswap.com/api/",
   wallet: new Wallet(process.env.PRIVATE_KEY!),
   chainId: "84532",
 });
@@ -372,13 +424,76 @@ the configured wallet address as `sender`.
 `DepositClient` sends on-chain transactions for deposit-related settlement token
 flows.
 
+### DepositClient environment setup
+
+`DepositClient` is different from `ExchangeClient`: it sends transactions
+directly to the blockchain through an EVM JSON-RPC endpoint. It does not use
+`API_URL` or the exchange HTTP API.
+
+For Base and Base Sepolia, provide the deployed `DepositLedger` address explicitly:
+
 ```ts
+import "dotenv/config";
 import { Wallet } from "ethers";
+import { createDepositClient } from "@gammaswap/v2-exchange-sdk";
+
+if (!process.env.RPC_URL) throw new Error("RPC_URL is required");
+if (!process.env.PRIVATE_KEY) throw new Error("PRIVATE_KEY is required");
+if (!process.env.DEPOSIT_LEDGER_CONTRACT) {
+  throw new Error("DEPOSIT_LEDGER_CONTRACT is required for Base Sepolia");
+}
 
 const deposit = createDepositClient({
-  rpcUrl: `BASE_SEPOLIA_RPC_URL`,
-  wallet: new Wallet(process.env.PRIVATE_KEY!),
+  rpcUrl: process.env.RPC_URL,
+  wallet: new Wallet(process.env.PRIVATE_KEY),
   chainId: "84532",
+  depositLedger: process.env.DEPOSIT_LEDGER_CONTRACT,
+});
+```
+
+The SDK verifies that the RPC network matches `chainId`. It then reads the
+settlement token, Permit2, and AccountLedger addresses from the DepositLedger
+contract.
+
+Amounts are human decimal strings using six settlement-token decimals:
+
+```ts
+const amount = "100.25";
+```
+
+For a normal approval-based deposit:
+
+```ts
+await deposit.approveDepositLedger({
+  amount,
+  confirmations: 1,
+});
+
+const result = await deposit.deposit({
+  amount,
+  confirmations: 1,
+  logTxId: false,
+});
+
+console.log(result.tx.hash);
+console.log(result.txId);
+```
+
+For a Permit2 deposit, approve Permit2 first, then call
+`depositWithPermit()`:
+
+```ts
+await deposit.approvePermit2({
+  amount,
+  confirmations: 1,
+});
+
+const result = await deposit.depositWithPermit({
+  amount,
+  nonce: "0",
+  deadline: "2000000000",
+  confirmations: 1,
+  logTxId: false,
 });
 ```
 
@@ -420,10 +535,20 @@ const deposit = createDepositClient({
 - The client checks the RPC chain ID before contract reads and transactions.
 - `depositLedger` can be passed explicitly or resolved from the default
   contracts for the configured chain.
+- The current Base Sepolia default configuration does not include a
+  `depositLedger` address. Pass `depositLedger` explicitly or provide it
+  through `contracts`.
+- The localhost configuration includes a hard-coded DepositLedger address for
+  local development only.
 - Settlement token, Permit2, and account ledger addresses are read from the
   deposit ledger contract.
+- `deposit()` and `depositWithPermit()` wait for transaction confirmation and
+  return the transaction response, receipt, deposited amount, and queued
+  deposit transaction ID.
 - `deposit()` logs the deposit `txId` by default. Pass `logTxId: false` in the
   input to suppress that log.
+- Never use the sample test mnemonic or a production private key in source
+  control.
 
 ## ExchangeWebSocketClient
 
@@ -432,7 +557,7 @@ const deposit = createDepositClient({
 
 ```ts
 const ws = createExchangeWebSocketClient({
-  websocketUrl: "wss://exchange-api.gammaswap.com",
+  websocketUrl: "wss://external-api.gammaswap.com/ws/",
   onError: (error) => console.error(error),
 });
 
@@ -507,7 +632,7 @@ ws.close();
 
 ```ts
 const oracle = createOracleWebSocketClient({
-  websocketUrl: "wss://exchange-api.gammaswap.com",
+  websocketUrl: "wss://oracle-api.gammaswap.com/ws/",
   stalePriceTimeoutMs: 30_000,
   onError: (error) => console.error(error),
 });
@@ -607,6 +732,22 @@ pnpm sample:agent:claim
 pnpm sample:ws:book
 pnpm sample:ws:oracle
 ```
+
+The deposit sample reads these environment variables:
+
+```env
+RPC_URL=http://localhost:8545
+CHAIN_ID=31337
+TEST_MNEMONIC=test test test test test test test test test test test junk
+WALLET_INDEX=0
+DEPOSIT_LEDGER_CONTRACT=0x...
+DEPOSIT_AMOUNT=1000
+```
+
+`DEPOSIT_LEDGER_CONTRACT` is optional for the localhost sample because the SDK
+has a localhost default. It is required when using a chain without a default
+DepositLedger address, such as the current Base Sepolia configuration. Use a
+test mnemonic only with a local development chain.
 
 The older direct API examples live in `scripts/api`.
 
