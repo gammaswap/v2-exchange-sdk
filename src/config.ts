@@ -18,9 +18,9 @@ export const BASE_EXCHANGE_CHAIN_CONFIG = parseExchangeChainConfig({
 export const BASE_SEPOLIA_EXCHANGE_CHAIN_CONFIG = parseExchangeChainConfig({
   chainId: ChainId.BASE_SEPOLIA,
   contracts: {
-    exchange: "0x756C91877892068383292Dd66b347640db5fE426",
-    ledger: "0xfB55E27Bb4c3E29cD253CbC74B0552FDa8Bc6189",
-    settlementToken: "0xdf3d36447b22e9feEe337765DdC413d09fA03bC2",
+    exchange: "0x21506cb57E2897F33f219d692Ab20c63057bA92A",
+    ledger: "0x4a9816D7ED0E3ef4E3eD29aD3bd6011d85020bCE",
+    settlementToken: "0xFdF708806FB946E6Bf093Ba1f5aa0CE54A3a531e",
     permit2: PERMIT2_ADDRESS,
   },
 });

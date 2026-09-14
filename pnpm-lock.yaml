@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      ethers:
-        specifier: ^6.15.0
-        version: 6.17.0
       ws:
         specifier: ^8.14.2
         version: 8.21.0
@@ -33,6 +30,9 @@ importers:
       eslint:
         specifier: ^9.0.0
         version: 9.39.5
+      ethers:
+        specifier: 6.17.0
+        version: 6.17.0
       prettier:
         specifier: ^3.0.0
         version: 3.9.5

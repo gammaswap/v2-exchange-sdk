@@ -1,6 +1,6 @@
 {
   "name": "@gammaswap/v2-exchange-sdk",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "TypeScript SDK for the GammaSwap v2 exchange.",
   "license": "MIT",
   "type": "module",
@@ -156,20 +156,22 @@
     "url": "git+ssh://git@github.com/gammaswap/v2-exchange-sdk.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@gammaswap"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "bugs": {
     "url": "https://github.com/gammaswap/v2-exchange-sdk/issues"
   },
   "homepage": "https://github.com/gammaswap/v2-exchange-sdk#readme",
   "engines": {
-    "node": ">=20",
-    "pnpm": ">=10"
+    "node": ">=20"
   },
   "author": "Daniel D. Alcarraz (https://github.com/0xDanr)",
   "sideEffects": false,
+  "peerDependencies": {
+    "ethers": "^6.17.0"
+  },
   "dependencies": {
-    "ethers": "^6.15.0",
     "ws": "^8.14.2"
   },
   "devDependencies": {
@@ -179,6 +181,7 @@
     "axios": "^1.19.0",
     "dotenv": "^17.4.2",
     "eslint": "^9.0.0",
+    "ethers": "6.17.0",
     "prettier": "^3.0.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.3",
