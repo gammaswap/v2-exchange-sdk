@@ -61,9 +61,32 @@ constructors receive their values explicitly.
 | `RPC_URL`                 | `DepositClient` JSON-RPC connection | Yes for deposits                     |
 | `CHAIN_ID`                | Network selection                   | Yes for signed/on-chain clients      |
 | `PRIVATE_KEY`             | Wallet signing                      | Yes for signed actions               |
+| `VERIFYING_CONTRACT`      | Standalone hashing helpers          | Only for direct hashing usage        |
 | `DEPOSIT_LEDGER_CONTRACT` | DepositLedger address               | Required on Base Sepolia currently   |
 | `ORDERBOOK_WS_URL`        | Exchange websocket endpoint         | Required for orderbook websocket use |
 | `ORACLE_FEED_WS_URL`      | Oracle websocket sample             | Required by oracle websocket samples |
+
+### Signing environment variables
+
+`VERIFYING_CONTRACT` is only used by the standalone hashing helpers and must
+match the exchange contract address for `CHAIN_ID`. It must not be set to the
+ledger, DepositLedger, or settlement-token address. It must be set to the
+exchange contract address.
+
+`ExchangeClient` derives the verifying contract from its configured
+`contracts.exchange`, so normal client usage does not depend on
+`VERIFYING_CONTRACT`.
+
+If using standalone hashing helpers, prefer passing an explicit domain:
+
+```ts
+const domain = getExchangeDomain(CHAIN_ID, EXCHANGE_CONTRACT);
+const orderHash = hashFillOrderJS(order, domain);
+```
+
+When using environment variables, load `dotenv` before importing the SDK
+because the default hashing domain is initialized when the hashing module is
+imported.
 
 ## Imports
 
