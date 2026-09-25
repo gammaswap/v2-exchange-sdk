@@ -328,3 +328,44 @@ test("oracle websocket subpath exports the public client API", () => {
   assert.equal(typeof OracleWebSocketClient, "function");
   assert.equal(typeof createOracleWebSocketClient, "function");
 });
+
+test("OracleWebSocketClient retries when a reconnect handshake never completes", async () => {
+  const errors = [];
+  const client = createClient({
+    connectTimeoutMs: 20,
+    onError: (error) => errors.push(error),
+  });
+  const { socket } = await subscribe(client);
+
+  socket.serverClose();
+  await settle();
+  const hungSocket = FakeWebSocket.latest();
+  assert.notEqual(hungSocket, socket);
+
+  await wait(30);
+  await settle();
+
+  assert.equal(hungSocket.terminated, true);
+  assert.ok(errors.some((error) => /timed out after 20ms/.test(error.message)));
+  const retrySocket = FakeWebSocket.latest();
+  assert.notEqual(retrySocket, hungSocket);
+  retrySocket.open();
+  await settle();
+
+  assert.equal(client.connectionState, "open");
+  assert.deepEqual(retrySocket.sentJson(0), { type: "subscribe", symbolId: SYMBOL_ID });
+
+  client.close();
+});
+
+test("OracleWebSocketClient rejects connect() when the handshake times out", async () => {
+  const client = createClient({ reconnect: false, connectTimeoutMs: 20 });
+
+  await assert.rejects(client.connect(), /timed out after 20ms/);
+  assert.equal(FakeWebSocket.latest().terminated, true);
+  assert.equal(client.connectionState, "closed");
+});
+
+test("OracleWebSocketClient rejects an invalid connectTimeoutMs", () => {
+  assert.throws(() => createClient({ connectTimeoutMs: 0 }), ProtocolValidationError);
+});
