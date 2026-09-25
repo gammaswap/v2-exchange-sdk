@@ -23,6 +23,7 @@ export interface SubscriptionWebSocketClientOptions {
   reconnectDelayMs?: number;
   maxReconnectDelayMs?: number;
   ackTimeoutMs?: number;
+  connectTimeoutMs?: number;
   onError?: (error: unknown) => void;
 }
 
@@ -50,6 +51,7 @@ const OPEN = 1;
 const DEFAULT_RECONNECT_DELAY_MS = 1_000;
 const DEFAULT_MAX_RECONNECT_DELAY_MS = 30_000;
 const DEFAULT_ACK_TIMEOUT_MS = 15_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 15_000;
 
 export abstract class BaseSubscriptionWebSocketClient<
   THandlers extends WebSocketErrorHandler,
@@ -64,6 +66,7 @@ export abstract class BaseSubscriptionWebSocketClient<
   private readonly reconnectDelayMs: number;
   private readonly maxReconnectDelayMs: number;
   private readonly ackTimeoutMs: number;
+  private readonly connectTimeoutMs: number;
   private readonly onError?: (error: unknown) => void;
   private readonly config: SubscriptionWebSocketClientConfig;
 
@@ -73,6 +76,7 @@ export abstract class BaseSubscriptionWebSocketClient<
   private connectResolve?: () => void;
   private connectReject?: (error: unknown) => void;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private connectTimer?: ReturnType<typeof setTimeout>;
   private reconnectAttempt = 0;
   private manuallyClosed = false;
   private readonly pendingSubscribes = new Map<string, PendingAck>();
@@ -105,6 +109,10 @@ export abstract class BaseSubscriptionWebSocketClient<
       options.ackTimeoutMs ?? DEFAULT_ACK_TIMEOUT_MS,
       "$.ackTimeoutMs",
     );
+    this.connectTimeoutMs = parsePositiveIntegerOption(
+      options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS,
+      "$.connectTimeoutMs",
+    );
     this.onError = options.onError;
     this.config = config;
   }
@@ -132,11 +140,24 @@ export abstract class BaseSubscriptionWebSocketClient<
       throw error;
     }
 
-    this.attachSocketListeners(this.socket);
+    const socket = this.socket;
+    this.attachSocketListeners(socket);
     this.connectPromise = new Promise((resolve, reject) => {
       this.connectResolve = resolve;
       this.connectReject = reject;
     });
+    // Without this, a handshake that never completes leaves the client in
+    // "connecting"/"reconnecting" with nothing scheduled to retry.
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = undefined;
+      if (socket === this.socket && socket.readyState === CONNECTING) {
+        this.handleConnectionFailure(
+          new ExchangeSdkError(
+            `${this.config.closeEventPrefix} connect timed out after ${this.connectTimeoutMs.toString()}ms`,
+          ),
+        );
+      }
+    }, this.connectTimeoutMs);
 
     return this.connectPromise;
   }
@@ -561,7 +582,15 @@ export abstract class BaseSubscriptionWebSocketClient<
     return this.socket?.readyState === OPEN;
   }
 
+  private clearConnectTimer(): void {
+    if (this.connectTimer !== undefined) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = undefined;
+    }
+  }
+
   private resolveConnect(): void {
+    this.clearConnectTimer();
     this.connectPromise = undefined;
     const resolve = this.connectResolve;
     this.connectResolve = undefined;
@@ -570,6 +599,7 @@ export abstract class BaseSubscriptionWebSocketClient<
   }
 
   private rejectConnect(error: unknown): void {
+    this.clearConnectTimer();
     this.connectPromise = undefined;
     const reject = this.connectReject;
     this.connectResolve = undefined;

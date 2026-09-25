@@ -618,6 +618,8 @@ ws.close();
 - `maxReconnectDelayMs`: optional reconnect delay cap, defaults to `30000`.
 - `ackTimeoutMs`: optional subscribe/unsubscribe acknowledgement timeout,
   defaults to `15000`.
+- `connectTimeoutMs`: optional handshake timeout; a connect attempt that has
+  not opened by then is dropped and retried. Defaults to `15000`.
 - `onError`: optional global error callback.
 
 ### Available functions and properties:
@@ -694,6 +696,8 @@ oracle.close();
 - `maxReconnectDelayMs`: optional reconnect delay cap, defaults to `30000`.
 - `ackTimeoutMs`: optional subscribe/unsubscribe acknowledgement timeout,
   defaults to `15000`.
+- `connectTimeoutMs`: optional handshake timeout; a connect attempt that has
+  not opened by then is dropped and retried. Defaults to `15000`.
 - `stalePriceTimeoutMs`: optional maximum time without a price update for a
   subscribed symbol, defaults to `30000`.
 - `onError`: optional global error callback.
